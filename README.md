@@ -1,65 +1,54 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400"></a></p>
+Saya ingin membuat sistem manajemen inventaris, operasional, dan keuangan berbasis web menggunakan Laravel 9 dan MySQL (phpMyAdmin). Tolong bantu saya merancang arsitektur kode, skema database (migration), dan logika sistem secara bertahap.
+Berikut adalah gambaran detail sistem dan aturan bisnis (business logic) yang harus diterapkan:
 
-<p align="center">
-<a href="https://travis-ci.org/laravel/framework"><img src="https://travis-ci.org/laravel/framework.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+### 1. KONTETSK & LATAR BELAKANG
 
-## About Laravel
+Sistem ini dibuat untuk bisnis penjualan baterai panel surya, sepeda listrik, dan komponen terkait. Saat ini pencatatan masih menggunakan spreadsheet secara manual, sehingga membutuhkan sistem terintegrasi yang mencatat seluruh alur mulai dari Pembelian (PO), Stok, Operasional, Penjualan, hingga Laporan Keuangan.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+### 2. ATURAN BISNIS & LOGIKA UTAMA (BUSINESS LOGIC)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+#### A. Pembelian (Purchase Order / PO) & Hutang
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- Mengakomodasi fleksibilitas pembayaran ke supplier: Cash/Tunai, Belum Dibayar (Unpaid), dan Pembayaran Bertahap/Termin (Partial).
+- Setiap PO harus mencatat histori pembayarannya.
+- Barang dapat masuk ke stok terlebih dahulu meskipun pembayaran belum lunas.
+- Harga beli per unit produk dapat berbeda-beda pada setiap PO/transaksi pembelian.
 
-## Learning Laravel
+#### B. Persediaan & Metode FIFO (Lot / Batch Tracking)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- Stok tidak digabung begitu saja menjadi harga rata-rata, melainkan dipisah berdasarkan _Batch Pembelian_ (tanggal beli dan harga beli masing-masing).
+- Contoh Logika:
+    - Hari 1 beli 5 unit @ Rp 1.000.000.
+    - Hari 2 beli 6 unit @ Rp 1.100.000.
+    - Total stok di sistem mencatat 11 unit (terbagi 2 batch dan di tampilkan breakdown nya).
+- Saat Penjualan: Sistem secara otomatis memotong stok dari batch tertua (First-In, First-Out / FIFO).
+    - Jika terjual 4 unit, sistem akan memotong 3 unit dari Batch Hari 1 dan 1 unit dari Batch Hari 2.
+- HPP (Harga Pokok Penjualan) dihitung secara riil berdasarkan harga beli asli dari unit/batch yang terpakai.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 2000 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+#### C. Penjualan & Piutang
 
-## Laravel Sponsors
+- Harga jual per produk ke customer bersifat dinamis (dapat diubah sesuai kesepakatan/negosiasi per transaksi).
+- Mengakomodasi pembayaran dari customer secara Cash, Unpaid, maupun Termin/Cicilan.
+- Setiap transaksi penjualan secara otomatis menghitung HPP (beban pokok) berdasarkan pemotongan stok FIFO di atas.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+#### D. Pengeluaran Operasional
 
-### Premium Partners
+- CRUD sederhana untuk pencatatan biaya operasional harian/bulanan (Gaji, Listrik, Sewa, Transportasi, dll).
+- Kategori biaya operasional bersifat dinamis.
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+#### E. Pelaporan
 
-## Contributing
+Sistem wajib menghasilkan laporan akurat sebagai berikut:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+1. Laporan Stok: Menampilkan total stok beserta rincian breakdown per batch pembelian.
+2. Laporan Laba Rugi (Profit & Loss):
+    - Pendapatan Penjualan - Total HPP (FIFO) = Laba Kotor.
+    - Laba Kotor - Total Biaya Operasional = Laba Bersih.
+3. Laporan Arus Kas (Cash Flow): Pencatatan real-time kas masuk (pembayaran customer) dan kas keluar (pembelian supplier + operasional).
+4. Laporan Hutang & Piutang (AP & AR): Tracking sisa tagihan dan histori pembayaran termin untuk supplier dan customer.
 
-## Code of Conduct
+---
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### TUGAS PERTAMA KAMU:
 
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
-"# new_penjualan" 
+Tolong konfirmasi pemahamanmu terhadap alur di atas. Jika sudah paham, langkah awal buatkan saya **Migration Laravel 9 lengkap** (beserta relasi Foreign Key dan tipe datanya) yang mencakup seluruh struktur database untuk memenuhi kebutuhan sistem ini.
