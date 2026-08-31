@@ -1,7 +1,6 @@
-Saya ingin membuat sistem manajemen inventaris, operasional, dan keuangan berbasis web menggunakan Laravel 9 dan MySQL (phpMyAdmin). Tolong bantu saya merancang arsitektur kode, skema database (migration), dan logika sistem secara bertahap.
-Berikut adalah gambaran detail sistem dan aturan bisnis (business logic) yang harus diterapkan:
+# New Sales APP
 
-### 1. KONTETSK & LATAR BELAKANG
+### 1. KONTEKS & LATAR BELAKANG
 
 Sistem ini dibuat untuk bisnis penjualan baterai panel surya, sepeda listrik, dan komponen terkait. Saat ini pencatatan masih menggunakan spreadsheet secara manual, sehingga membutuhkan sistem terintegrasi yang mencatat seluruh alur mulai dari Pembelian (PO), Stok, Operasional, Penjualan, hingga Laporan Keuangan.
 
@@ -48,7 +47,3 @@ Sistem wajib menghasilkan laporan akurat sebagai berikut:
 4. Laporan Hutang & Piutang (AP & AR): Tracking sisa tagihan dan histori pembayaran termin untuk supplier dan customer.
 
 ---
-
-### TUGAS PERTAMA KAMU:
-
-Tolong konfirmasi pemahamanmu terhadap alur di atas. Jika sudah paham, langkah awal buatkan saya **Migration Laravel 9 lengkap** (beserta relasi Foreign Key dan tipe datanya) yang mencakup seluruh struktur database untuk memenuhi kebutuhan sistem ini.
