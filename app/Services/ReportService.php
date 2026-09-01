@@ -6,6 +6,7 @@ use App\Models\CashFlow;
 use App\Models\Expense;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
+use App\Models\PurchasePayment;
 use App\Models\SaleItem;
 use App\Models\SalesOrder;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +47,8 @@ class ReportService
     public function profitLossReport(string $startDate, string $endDate): array
     {
         $revenue = SalesOrder::whereBetween('so_date', [$startDate, $endDate])->sum('total_amount');
+        $revenuePaid = SalesOrder::whereBetween('so_date', [$startDate, $endDate])->sum('paid_amount');
+        $revenuePending = $revenue - $revenuePaid; // "Pendapatan Tertahan": bagian penjualan yang belum dibayar (sudah masuk piutang)
         $hpp     = SalesOrder::whereBetween('so_date', [$startDate, $endDate])->sum('total_hpp');
         $grossProfit = $revenue - $hpp;
 
@@ -61,12 +64,87 @@ class ReportService
         return [
             'period'                => [$startDate, $endDate],
             'revenue'                => (float) $revenue,
+            'revenue_paid'           => (float) $revenuePaid,
+            'revenue_pending'        => (float) $revenuePending,
             'hpp'                    => (float) $hpp,
             'gross_profit'           => (float) $grossProfit,
             'operational_expense'    => (float) $operationalExpense,
             'expense_by_category'    => $expenseByCategory,
             'net_profit'             => (float) $netProfit,
         ];
+    }
+
+    /**
+     * Ringkasan penjualan & pembelian (accrual, berdasar tanggal transaksi) untuk suatu rentang.
+     * Dipakai di dashboard: "Penjualan Bulan Ini" (semua, termasuk yang belum dibayar)
+     * dan "Total Pembelian Bulan Ini".
+     */
+    public function salesPurchaseSummary(string $startDate, string $endDate): array
+    {
+        $totalSales    = SalesOrder::whereBetween('so_date', [$startDate, $endDate])->sum('total_amount');
+        $totalPurchase = PurchaseOrder::whereBetween('po_date', [$startDate, $endDate])->sum('total_amount');
+
+        return [
+            'total_sales'    => (float) $totalSales,
+            'total_purchase' => (float) $totalPurchase,
+        ];
+    }
+
+    /**
+     * Pengeluaran kas riil (dari ledger cash_flows) pada rentang tanggal, dipisah
+     * antara Biaya Operasional (Expense) dan Biaya Pembelian (pembayaran PO ke supplier).
+     */
+    public function expenseBreakdown(string $startDate, string $endDate): array
+    {
+        $rows = CashFlow::where('direction', 'out')
+            ->whereBetween('transaction_date', [$startDate, $endDate])
+            ->select('source_type', DB::raw('SUM(amount) as total'))
+            ->groupBy('source_type')
+            ->pluck('total', 'source_type');
+
+        $operational = (float) ($rows[Expense::class] ?? 0);
+        $purchase    = (float) ($rows[PurchasePayment::class] ?? 0);
+
+        return [
+            'operational' => $operational,
+            'purchase'    => $purchase,
+            'total'       => $operational + $purchase,
+        ];
+    }
+
+    /**
+     * Produk terlaris dalam suatu rentang tanggal, diurutkan dari qty terjual terbanyak.
+     */
+    public function topSellingProducts(string $startDate, string $endDate, int $limit = 5)
+    {
+        return SaleItem::query()
+            ->join('sales_orders', 'sales_orders.id', '=', 'sale_items.sales_order_id')
+            ->join('products', 'products.id', '=', 'sale_items.product_id')
+            ->whereBetween('sales_orders.so_date', [$startDate, $endDate])
+            ->select(
+                'products.id as product_id',
+                'products.name as product_name',
+                DB::raw('SUM(sale_items.qty) as total_qty'),
+                DB::raw('SUM(sale_items.subtotal) as total_revenue')
+            )
+            ->groupBy('products.id', 'products.name')
+            ->orderByDesc('total_qty')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Tren penjualan harian (accrual, berdasar so_date) dalam suatu rentang tanggal.
+     * Dipakai untuk grafik di dashboard.
+     */
+    public function dailySalesTrend(string $startDate, string $endDate)
+    {
+        return SalesOrder::whereBetween('so_date', [$startDate, $endDate])
+            ->select('so_date', DB::raw('SUM(total_amount) as total'))
+            ->groupBy('so_date')
+            ->orderBy('so_date')
+            ->get()
+            ->mapWithKeys(fn($row) => [$row->so_date->format('Y-m-d') => (float) $row->total]);
     }
 
     /**
