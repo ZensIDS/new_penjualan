@@ -18,7 +18,10 @@ class SalesOrder extends Model
     ];
 
     protected $casts = [
-        'so_date' => 'date',
+        'so_date'      => 'date',
+        'total_amount' => 'decimal:2',
+        'total_hpp'    => 'decimal:2',
+        'paid_amount'  => 'decimal:2',
     ];
 
     public function customer()

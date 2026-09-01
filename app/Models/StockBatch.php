@@ -16,7 +16,10 @@ class StockBatch extends Model
     ];
 
     protected $casts = [
-        'batch_date' => 'date',
+        'batch_date'    => 'date',
+        'buy_price'     => 'decimal:2',
+        'qty_in'        => 'integer',
+        'qty_remaining' => 'integer',
     ];
 
     public function product()

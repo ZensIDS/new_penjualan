@@ -14,6 +14,12 @@ class SaleItemAllocation extends Model
         'hpp_subtotal',
     ];
 
+    protected $casts = [
+        'qty_taken'         => 'integer',
+        'buy_price_at_time' => 'decimal:2',
+        'hpp_subtotal'      => 'decimal:2',
+    ];
+
     public function saleItem()
     {
         return $this->belongsTo(SaleItem::class);

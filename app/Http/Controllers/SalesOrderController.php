@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreSalesOrderRequest;
 use App\Http\Requests\StoreSalesPaymentRequest;
+use App\Models\Customer;
+use App\Models\Product;
 use App\Models\SalesOrder;
 use App\Services\SalesOrderService;
 
@@ -18,6 +20,21 @@ class SalesOrderController extends Controller
             ->paginate(20);
 
         return view('sales-orders.index', compact('salesOrders'));
+    }
+
+    public function create()
+    {
+        $customers = Customer::orderBy('name')->get(['id', 'name']);
+
+        // Semua produk aktif dikirim (termasuk yang stoknya 0) supaya tetap terlihat
+        // di dropdown; qty_on_hand dipakai di form (JS) untuk menonaktifkan opsi yang
+        // stoknya habis dan validasi ringan sebelum submit. Batas final tetap ditegakkan
+        // server-side lewat StockService::allocateFifo().
+        $products = Product::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'unit', 'qty_on_hand']);
+
+        return view('sales-orders.create', compact('customers', 'products'));
     }
 
     public function show(SalesOrder $salesOrder)

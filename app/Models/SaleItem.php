@@ -15,6 +15,13 @@ class SaleItem extends Model
         'hpp_subtotal',
     ];
 
+    protected $casts = [
+        'qty'          => 'integer',
+        'sell_price'   => 'decimal:2',
+        'subtotal'     => 'decimal:2',
+        'hpp_subtotal' => 'decimal:2',
+    ];
+
     public function salesOrder()
     {
         return $this->belongsTo(SalesOrder::class);

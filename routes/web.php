@@ -39,6 +39,13 @@ Route::middleware('auth')->group(function () {
     Route::resource('purchase-orders', PurchaseOrderController::class)
         ->only(['index', 'show']);
 
+    // Sama seperti purchase-orders/create di atas: harus didaftarkan sebelum
+    // resource(['index','show']) supaya /sales-orders/create tidak ketangkep
+    // wildcard /sales-orders/{salesOrder} milik route 'show'.
+    Route::get('sales-orders/create', [SalesOrderController::class, 'create'])
+        ->middleware('role:superadmin')
+        ->name('sales-orders.create');
+
     Route::resource('sales-orders', SalesOrderController::class)
         ->only(['index', 'show']);
 

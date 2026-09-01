@@ -16,7 +16,8 @@ class Product extends Model
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'is_active'   => 'boolean',
+        'qty_on_hand' => 'integer',
     ];
 
     public function category()
