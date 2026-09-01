@@ -1,15 +1,6 @@
 # TODO — Sistem Inventaris, Operasional & Keuangan
 
-Terakhir diupdate: CRUD Product, Category, Supplier, Customer, Expense, ExpenseCategory sudah
-selesai end-to-end (Controller JSON + view index dengan modal Alpine.js/AJAX). PO (index, form
-input dengan item baris dinamis, halaman detail + form pembayaran) dan halaman Stok (view cek
-cepat, terpisah dari Laporan Stok formal) sudah jadi. Sisa Fase 8: form input SO + halaman
-detail SO, dan halaman-halaman laporan.
-
-**Bug fix saat ini:** `StorePurchasePaymentRequest` & `StoreSalesPaymentRequest` masih mengecek
-role lama (`admin`/`finance`/`kasir`) di `authorize()`, padahal sistem role sekarang cuma
-`superadmin`/`viewer` — akibatnya endpoint tambah pembayaran selalu 403 walau route sudah
-dijaga `role:superadmin`. Sudah diperbaiki jadi `$this->user()->isSuperadmin()`.
+Terakhir diupdate: Pembuatan Seeder. Selanjutnya membuat bagian report.
 
 ## ✅ Fase 1 — Database (Migration)
 
@@ -104,9 +95,14 @@ dijaga `role:superadmin`. Sudah diperbaiki jadi `$this->user()->isSuperadmin()`.
       karena tidak dipakai lagi).
 - [ ] Halaman laporan (Stok, Laba Rugi, Cash Flow, AP/AR) — Controller & Service sudah siap, tinggal buat view-nya
 
-## ⬜ Fase 9 — Data Pendukung
+## 🟡 Fase 9 — Data Pendukung
 
-- [ ] Seeder data contoh (kategori, produk, supplier, customer) untuk development/testing
+- [x] Seeder data contoh (kategori, produk, supplier, customer) untuk development/testing —
+      `CategorySeeder` (6 kategori), `ProductSeeder` (18 produk, terhubung ke kategori via nama,
+      tanpa `sku` karena kolom itu sudah sengaja didrop dari tabel `products`, `qty_on_hand`
+      sengaja 0 karena itu cache dari `StockService`), `SupplierSeeder` (4 supplier),
+      `CustomerSeeder` (5 customer). Semua sudah didaftarkan di `DatabaseSeeder` dengan urutan
+      `UserSeeder → CategorySeeder → ProductSeeder → SupplierSeeder → CustomerSeeder`.
 - [ ] Factory untuk testing otomatis
 
 ## ⬜ Fase 10 — Pengujian & Penyempurnaan
