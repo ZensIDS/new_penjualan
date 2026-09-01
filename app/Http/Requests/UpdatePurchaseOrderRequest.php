@@ -4,12 +4,15 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StorePurchaseOrderRequest extends FormRequest
+class UpdatePurchaseOrderRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Hanya superadmin yang boleh input PO. Viewer hanya boleh melihat.
-        return $this->user()->isSuperadmin();
+        // Hanya superadmin, dan hanya kalau PO ini belum pernah dibayar sama sekali.
+        // Kalau sudah ada pembayaran, PO dianggap final — tolak di sini duluan
+        // (403) sebelum sempat masuk ke Service.
+        return $this->user()->isSuperadmin()
+            && $this->route('purchaseOrder')?->canBeModified();
     }
 
     public function rules(): array
@@ -23,17 +26,11 @@ class StorePurchaseOrderRequest extends FormRequest
             'items.*.product_id'       => ['required', 'exists:products,id'],
             'items.*.qty'              => ['required', 'integer', 'min:1'],
             'items.*.buy_price'        => ['required', 'numeric', 'min:0'],
-
-            'initial_payment'          => ['nullable', 'numeric', 'min:0'],
-            'payment_method'           => ['nullable', 'in:cash,transfer,other'],
         ];
     }
 
     public function withValidator($validator): void
     {
-        // Satu produk cuma boleh muncul di 1 baris item — sama seperti aturan di SO.
-        // Dicek juga di sini (bukan cuma di form JS) supaya request yang dikirim
-        // langsung tanpa lewat form tetap ditolak.
         $validator->after(function ($validator) {
             $productIds = collect($this->input('items', []))->pluck('product_id')->filter();
 

@@ -1,6 +1,43 @@
 # TODO — Sistem Inventaris, Operasional & Keuangan
 
-Terakhir diupdate: Pembuatan Seeder. Selanjutnya membuat bagian report.
+**Fitur baru — Edit & Hapus PO/SO (khusus transaksi yang belum dibayar sama sekali):**
+
+- `PurchaseOrder`/`SalesOrder` dapat method `canBeModified()`: true kalau `payment_status ===
+'unpaid'` DAN `paid_amount <= 0`. Dipakai di Request (`authorize()`), Controller, dan view
+  (tombol Edit/Hapus cuma muncul kalau ini true).
+- PO: `PurchaseOrderService::update()`/`delete()` — cuma boleh jalan kalau SEMUA batch stok
+  dari PO ini juga belum kepakai sama sekali (`StockService::isPurchaseItemBatchUsed()`),
+  soalnya status bayar & pergerakan stok itu dua hal terpisah — PO bisa saja belum dibayar
+  tapi barangnya sudah kadung terjual. Batch lama dihapus (`StockService::removeUnusedPurchaseBatch()`)
+  lalu dibuat ulang.
+- SO: `SalesOrderService::update()`/`delete()` — alokasi FIFO lama dikembalikan dulu ke batch
+  asal (`StockService::reverseAllocations()`, yang bug lamanya juga sudah diperbaiki: sekarang
+  sync `qty_on_hand` untuk SEMUA produk yang kena, bukan cuma produk dari alokasi terakhir),
+  baru item baru dialokasikan ulang.
+- Route baru: `{resource}.edit` (GET), `{resource}.update` (PUT), `{resource}.destroy` (DELETE)
+  untuk `purchase-orders` & `sales-orders`, semua di grup `role:superadmin`.
+- View baru: `purchase-orders/edit.blade.php`, `sales-orders/edit.blade.php`.
+
+**Bug fix — PO bisa input produk sama di baris berbeda:** `StorePurchaseOrderRequest` ternyata
+dari awal tidak punya validasi cegah produk dobel (beda dengan `StoreSalesOrderRequest` yang
+sudah punya), dan JS `initProductSelect` di `purchase-orders/create.blade.php` juga tidak ada
+pengecekan sama sekali. Sudah disamakan dengan pola SO: validasi server-side di
+`withValidator()` (dipasang juga di `UpdatePurchaseOrderRequest`) + pengecekan JS yang
+menolak & mengembalikan pilihan kalau produk sudah dipakai di baris lain.
+
+**Bug fix — SO: select produk auto-pilih produk pertama:** select2 di `sales-orders/create.blade.php`
+dibangun murni dari opsi `data:` (bukan `<option>` statis kayak PO), dan tanpa entri kosong di
+array itu select2 otomatis menganggap opsi pertama sebagai default terpilih — beda dari yang
+terlihat (placeholder "Pilih produk" doang tampil visual, tapi value sebenarnya sudah keisi
+produk pertama sejak render awal, jadi pengecekan "produk sudah dipakai di baris lain" jadi
+gampang miss di baris-baris yang belum sempat disentuh user). Fix: tambahkan entri kosong
+`{ id: '', text: '— Pilih produk —' }` di depan array `data`, di form create maupun edit.
+
+**Fitur baru — Asal Penjualan (channel) di SO:** kolom `source` (string, default `offline`) di
+tabel `sales_orders`, daftar valid ada di `App\Models\SalesOrder::SOURCES` (`offline`,
+`whatsapp`, `shopee` — gampang ditambah tanpa migration baru). Selalu wajib diisi
+(`required|in:...`), select-nya ditaruh sebaris dengan Catatan di form create & edit, dan
+ditampilkan sebagai badge di halaman detail SO.
 
 ## ✅ Fase 1 — Database (Migration)
 
@@ -43,7 +80,11 @@ Terakhir diupdate: Pembuatan Seeder. Selanjutnya membuat bagian report.
 ## ✅ Fase 5 — Controller & Validasi (Web)
 
 - [x] `PurchaseOrderController` + `StorePurchaseOrderRequest` + `StorePurchasePaymentRequest`
+      — plus `edit()`/`update()`/`destroy()` + `UpdatePurchaseOrderRequest` (edit/hapus cuma
+      untuk PO yang belum dibayar sama sekali & barangnya belum kepakai)
 - [x] `SalesOrderController` + `StoreSalesOrderRequest` + `StoreSalesPaymentRequest`
+      — plus `edit()`/`update()`/`destroy()` + `UpdateSalesOrderRequest` (edit/hapus cuma
+      untuk transaksi yang belum dibayar sama sekali)
 - [x] Routes snippet siap tempel ke `routes/web.php`
 - [x] `ProductController`, `CategoryController` (CRUD lengkap, pola sama seperti contoh di atas)
 - [x] `SupplierController`, `CustomerController` (CRUD lengkap)

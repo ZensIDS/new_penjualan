@@ -36,6 +36,10 @@ Route::middleware('auth')->group(function () {
         ->middleware('role:superadmin')
         ->name('purchase-orders.create');
 
+    Route::get('purchase-orders/{purchaseOrder}/edit', [PurchaseOrderController::class, 'edit'])
+        ->middleware('role:superadmin')
+        ->name('purchase-orders.edit');
+
     Route::resource('purchase-orders', PurchaseOrderController::class)
         ->only(['index', 'show']);
 
@@ -45,6 +49,10 @@ Route::middleware('auth')->group(function () {
     Route::get('sales-orders/create', [SalesOrderController::class, 'create'])
         ->middleware('role:superadmin')
         ->name('sales-orders.create');
+
+    Route::get('sales-orders/{salesOrder}/edit', [SalesOrderController::class, 'edit'])
+        ->middleware('role:superadmin')
+        ->name('sales-orders.edit');
 
     Route::resource('sales-orders', SalesOrderController::class)
         ->only(['index', 'show']);
@@ -77,11 +85,19 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
 
     Route::post('purchase-orders', [PurchaseOrderController::class, 'store'])
         ->name('purchase-orders.store');
+    Route::put('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'update'])
+        ->name('purchase-orders.update');
+    Route::delete('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'destroy'])
+        ->name('purchase-orders.destroy');
     Route::post('purchase-orders/{purchaseOrder}/payments', [PurchaseOrderController::class, 'storePayment'])
         ->name('purchase-orders.payments.store');
 
     Route::post('sales-orders', [SalesOrderController::class, 'store'])
         ->name('sales-orders.store');
+    Route::put('sales-orders/{salesOrder}', [SalesOrderController::class, 'update'])
+        ->name('sales-orders.update');
+    Route::delete('sales-orders/{salesOrder}', [SalesOrderController::class, 'destroy'])
+        ->name('sales-orders.destroy');
     Route::post('sales-orders/{salesOrder}/payments', [SalesOrderController::class, 'storePayment'])
         ->name('sales-orders.payments.store');
 

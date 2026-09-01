@@ -39,4 +39,11 @@ class PurchaseOrder extends Model
     {
         return (float) $this->total_amount - (float) $this->paid_amount;
     }
+
+    // Edit & hapus PO hanya boleh selama belum ada pembayaran sama sekali.
+    // Begitu ada pembayaran (sekecil apa pun), PO dianggap final.
+    public function canBeModified(): bool
+    {
+        return $this->payment_status === 'unpaid' && (float) $this->paid_amount <= 0;
+    }
 }

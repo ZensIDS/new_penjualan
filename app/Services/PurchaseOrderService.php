@@ -98,6 +98,99 @@ class PurchaseOrderService
         });
     }
 
+    /**
+     * Update PO yang sudah ada: ganti data utama + replace semua item lama
+     * dengan item baru (batch stok lama dihapus, batch baru dibuat).
+     * HANYA boleh dipanggil selagi PO belum dibayar sama sekali dan
+     * belum ada barangnya yang terlanjur terjual.
+     *
+     * @param array $data ['supplier_id', 'po_date', 'note']
+     * @param array $items [['product_id', 'qty', 'buy_price'], ...]
+     *
+     * @throws \RuntimeException kalau PO sudah dibayar atau ada batch yang sudah kepakai
+     */
+    public function update(PurchaseOrder $po, array $data, array $items): PurchaseOrder
+    {
+        return DB::transaction(function () use ($po, $data, $items) {
+            $po->loadMissing('items.stockBatch');
+
+            $this->guardCanModify($po);
+
+            foreach ($po->items as $item) {
+                $this->stockService->removeUnusedPurchaseBatch($item);
+                $item->delete();
+            }
+
+            $totalAmount = 0;
+            foreach ($items as $item) {
+                $totalAmount += $item['qty'] * $item['buy_price'];
+            }
+
+            $po->update([
+                'supplier_id'  => $data['supplier_id'],
+                'po_date'      => $data['po_date'],
+                'note'         => $data['note'] ?? null,
+                'total_amount' => $totalAmount,
+            ]);
+
+            foreach ($items as $item) {
+                $poItem = $po->items()->create([
+                    'product_id' => $item['product_id'],
+                    'qty'        => $item['qty'],
+                    'buy_price'  => $item['buy_price'],
+                    'subtotal'   => $item['qty'] * $item['buy_price'],
+                ]);
+
+                $this->stockService->receiveFromPurchaseItem($poItem, $po->po_date);
+            }
+
+            return $po->fresh(['items', 'payments']);
+        });
+    }
+
+    /**
+     * Hapus PO beserta item & batch stoknya. HANYA boleh dipanggil selagi
+     * PO belum dibayar sama sekali dan belum ada barangnya yang terjual.
+     *
+     * @throws \RuntimeException kalau PO sudah dibayar atau ada batch yang sudah kepakai
+     */
+    public function delete(PurchaseOrder $po): void
+    {
+        DB::transaction(function () use ($po) {
+            $po->loadMissing('items.stockBatch');
+
+            $this->guardCanModify($po);
+
+            foreach ($po->items as $item) {
+                $this->stockService->removeUnusedPurchaseBatch($item);
+            }
+
+            // items ikut terhapus otomatis (cascadeOnDelete di migration purchase_order_items)
+            $po->delete();
+        });
+    }
+
+    /**
+     * Pastikan PO boleh diedit/dihapus: belum dibayar sama sekali, DAN
+     * semua barangnya belum ada yang terjual (batch masih utuh).
+     */
+    protected function guardCanModify(PurchaseOrder $po): void
+    {
+        if (! $po->canBeModified()) {
+            throw new \RuntimeException(
+                "PO #{$po->po_number} sudah ada pembayaran, tidak bisa diedit/dihapus lagi."
+            );
+        }
+
+        foreach ($po->items as $item) {
+            if ($this->stockService->isPurchaseItemBatchUsed($item)) {
+                throw new \RuntimeException(
+                    "PO #{$po->po_number} tidak bisa diedit/dihapus karena barang \"{$item->product->name}\" dari PO ini sudah terlanjur terjual."
+                );
+            }
+        }
+    }
+
     protected function resolvePaymentStatus(float $total, float $paid): string
     {
         if ($paid <= 0) {

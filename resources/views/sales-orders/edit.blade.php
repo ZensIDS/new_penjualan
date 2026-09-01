@@ -1,27 +1,35 @@
 @extends('layouts.app')
 
-@section('page-title', 'Buat Transaksi Penjualan')
+@section('page-title', 'Edit Transaksi Penjualan')
 
 @section('content')
 <div
-    x-data="soCreateForm(
+    x-data="soEditForm(
         {{ Illuminate\Support\Js::from($customers) }},
         {{ Illuminate\Support\Js::from($products) }},
-        {{ Illuminate\Support\Js::from(old('items', [['product_id' => '', 'qty' => 1, 'sell_price' => '']])) }}
+        {{ Illuminate\Support\Js::from(old('items', $salesOrder->items->map(fn ($item) => [
+            'product_id' => $item->product_id,
+            'qty'        => $item->qty,
+            'sell_price' => $item->sell_price,
+        ])->values())) }}
     )"
     x-cloak
 >
     <div class="mb-6">
-        <a href="{{ route('sales-orders.index') }}" class="text-sm text-ink/50 hover:text-ink inline-flex items-center gap-1 mb-2">
+        <a href="{{ route('sales-orders.show', $salesOrder) }}" class="text-sm text-ink/50 hover:text-ink inline-flex items-center gap-1 mb-2">
             <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-            Kembali ke daftar SO
+            Kembali ke detail transaksi
         </a>
-        <h2 class="text-2xl font-display font-semibold tracking-tight">Buat Transaksi Penjualan</h2>
-        <p class="text-sm text-ink/50 mt-1">Stok akan otomatis dipotong FIFO (batch tertua duluan) begitu transaksi disimpan.</p>
+        <h2 class="text-2xl font-display font-semibold tracking-tight tnum">Edit {{ $salesOrder->so_number }}</h2>
+        <p class="text-sm text-ink/50 mt-1">
+            Transaksi ini belum ada pembayaran, jadi masih bisa diedit bebas. Alokasi stok FIFO
+            lama akan dikembalikan dulu, lalu dialokasikan ulang sesuai perubahan item.
+        </p>
     </div>
 
-    <form method="POST" action="{{ route('sales-orders.store') }}" @submit="onSubmit">
+    <form method="POST" action="{{ route('sales-orders.update', $salesOrder) }}" @submit="onSubmit">
         @csrf
+        @method('PUT')
 
         {{-- Info utama --}}
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6 mb-6">
@@ -41,7 +49,7 @@
 
                 <div>
                     <label class="block text-sm font-medium mb-1.5">Tanggal Transaksi</label>
-                    <input type="date" name="so_date" value="{{ old('so_date', now()->toDateString()) }}"
+                    <input type="date" name="so_date" value="{{ old('so_date', $salesOrder->so_date->toDateString()) }}"
                            class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
                     @error('so_date')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
                 </div>
@@ -51,7 +59,7 @@
                 <div>
                     <label class="block text-sm font-medium mb-1.5">Catatan</label>
                     <textarea name="note" rows="2" placeholder="Opsional"
-                              class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">{{ old('note') }}</textarea>
+                              class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">{{ old('note', $salesOrder->note) }}</textarea>
                     @error('note')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
                 </div>
 
@@ -60,7 +68,7 @@
                     <select name="source"
                             class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
                         @foreach (\App\Models\SalesOrder::SOURCES as $value => $label)
-                            <option value="{{ $value }}" @selected(old('source', 'offline') === $value)>{{ $label }}</option>
+                            <option value="{{ $value }}" @selected(old('source', $salesOrder->source) === $value)>{{ $label }}</option>
                         @endforeach
                     </select>
                     @error('source')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
@@ -142,45 +150,17 @@
             </div>
         </div>
         @error('items')<p class="text-xs text-red-600 -mt-4 mb-6">{{ $message }}</p>@enderror
+        @error('error')<p class="text-xs text-red-600 -mt-4 mb-6">{{ $message }}</p>@enderror
         <p class="text-xs text-red-600 -mt-4 mb-6" x-show="hasStockError" x-cloak>
             Ada baris dengan qty melebihi stok tersedia — perbaiki dulu sebelum menyimpan.
         </p>
 
-        {{-- Pembayaran awal --}}
-        <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6 mb-6">
-            <h3 class="font-display font-semibold mb-1">Pembayaran Awal</h3>
-            <p class="text-xs text-ink/50 mb-4">Opsional — kosongkan kalau belum ada pembayaran sama sekali (status akan "Belum Bayar").</p>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1.5">Jumlah Dibayar</label>
-                    <div class="relative">
-                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-ink/40">Rp</span>
-                        <input type="text" inputmode="numeric"
-                               :value="formatRupiah(initialPayment)"
-                               @input="initialPayment = parseRupiah($event.target.value); $event.target.value = formatRupiah(initialPayment)"
-                               class="w-full rounded-xl border border-ink/12 pl-9 pr-3.5 py-2.5 text-sm tnum focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
-                        <input type="hidden" name="initial_payment" :value="initialPayment">
-                    </div>
-                    @error('initial_payment')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1.5">Metode Pembayaran</label>
-                    <select name="payment_method" x-model="paymentMethod"
-                            class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
-                        <option value="cash">Tunai</option>
-                        <option value="transfer">Transfer</option>
-                        <option value="other">Lainnya</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-
         <div class="flex justify-end gap-3">
-            <a href="{{ route('sales-orders.index') }}"
+            <a href="{{ route('sales-orders.show', $salesOrder) }}"
                class="text-sm font-medium px-5 py-2.5 rounded-xl border border-ink/12 hover:bg-ink/[0.03] transition-colors">Batal</a>
             <button type="submit"
                     class="text-sm font-semibold px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-ink shadow-glow hover:brightness-105 active:scale-[0.98] transition-all">
-                Simpan Transaksi
+                Simpan Perubahan
             </button>
         </div>
     </form>
@@ -189,7 +169,7 @@
 
 @push('scripts')
 <script>
-    function soCreateForm(customers, products, initialItems) {
+    function soEditForm(customers, products, initialItems) {
         return {
             customers,
             products,
@@ -199,8 +179,6 @@
                 qty: i.qty || 1,
                 sell_price: i.sell_price || '',
             })),
-            initialPayment: {{ (int) old('initial_payment', 0) }} || '',
-            paymentMethod: '{{ old('payment_method', 'cash') }}',
 
             addItem() {
                 this.items.push({ key: Math.random().toString(36).slice(2), product_id: '', qty: 1, sell_price: '' });
@@ -227,8 +205,6 @@
                 return this.items.some(i => this.exceedsStock(i));
             },
 
-            // Harga beli acuan = harga beli batch tertua yang masih ada stok (batch yang
-            // bakal benar-benar kepakai duluan kalau produk ini dijual sekarang, sesuai FIFO).
             buyPriceFor(productId) {
                 const p = this.products.find(p => p.id == productId);
                 return p && p.next_buy_price !== null && p.next_buy_price !== undefined
@@ -274,13 +250,9 @@
                 $(el).select2({
                     placeholder: '— Pilih customer —',
                     width: '100%',
-                    // dropdownParent HARUS body, bukan wrapper lokal — beberapa select
-                    // (mis. produk di "Item Barang") ada di dalam card yang overflow-hidden
-                    // (buat kliping sudut rounded), jadi dropdown select2 ikut kepotong
-                    // kalau dropdownParent-nya masih di dalam card itu.
                     dropdownParent: $('body'),
                 });
-                const old = {{ Illuminate\Support\Js::from(old('customer_id', '')) }};
+                const old = {{ Illuminate\Support\Js::from(old('customer_id', $salesOrder->customer_id)) }};
                 if (old) this.$nextTick(() => $(el).val(String(old)).trigger('change.select2'));
             },
 
@@ -290,11 +262,9 @@
                     placeholder: '— Pilih produk —',
                     width: '100%',
                     dropdownParent: $('body'),
-                    // Opsi kosong WAJIB ada duluan di data array. Tanpa ini, select2
-                    // (dibangun murni dari `data`, bukan <option> statis) otomatis
-                    // memilih item pertama di data sebagai default alih-alih kosong —
-                    // ini yang bikin baris baru sering "kebawa" produk baris sebelumnya
-                    // dan fitur pembatasan 1-produk-1-baris jadi kurang optimal.
+                    // Opsi kosong WAJIB ada duluan di data array, sama seperti di form
+                    // create — supaya baris yang belum diisi tidak otomatis kebawa
+                    // produk pertama.
                     data: [
                         { id: '', text: '— Pilih produk —' },
                         ...this.products.map(p => ({
@@ -306,9 +276,6 @@
                 }).on('change', function () {
                     const newVal = $(this).val();
 
-                    // 1 produk cuma boleh dipilih di 1 baris. Kalau produk yang baru dipilih
-                    // sudah dipakai di baris lain, batalkan pilihan & balikkan ke nilai
-                    // sebelumnya — tambah qty di baris yang sudah ada saja.
                     if (newVal && self.items.some(i => i.key !== item.key && i.product_id == newVal)) {
                         alert('Produk ini sudah dipilih di baris lain. Ubah qty di baris tersebut, atau pilih produk lain.');
                         $(this).val(item.product_id || null).trigger('change.select2');

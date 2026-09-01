@@ -6,6 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 
 class SalesOrder extends Model
 {
+    // Daftar asal/channel penjualan yang valid — dipakai di validasi Request
+    // dan di dropdown form create/edit. Tambah entri di sini kalau ada channel baru.
+    public const SOURCES = [
+        'offline'  => 'Offline',
+        'whatsapp' => 'WhatsApp',
+        'shopee'   => 'Shopee',
+    ];
+
     protected $fillable = [
         'so_number',
         'customer_id',
@@ -15,6 +23,7 @@ class SalesOrder extends Model
         'paid_amount',
         'payment_status',
         'note',
+        'source',
     ];
 
     protected $casts = [
@@ -47,5 +56,12 @@ class SalesOrder extends Model
     public function getGrossProfitAttribute(): float
     {
         return (float) $this->total_amount - (float) $this->total_hpp;
+    }
+
+    // Edit & hapus transaksi hanya boleh selama belum ada pembayaran sama sekali.
+    // Begitu ada pembayaran (sekecil apa pun), transaksi dianggap final.
+    public function canBeModified(): bool
+    {
+        return $this->payment_status === 'unpaid' && (float) $this->paid_amount <= 0;
     }
 }

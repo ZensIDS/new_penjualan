@@ -2,38 +2,38 @@
 
 namespace App\Http\Requests;
 
+use App\Models\SalesOrder;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
-class StorePurchaseOrderRequest extends FormRequest
+class UpdateSalesOrderRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Hanya superadmin yang boleh input PO. Viewer hanya boleh melihat.
-        return $this->user()->isSuperadmin();
+        // Hanya superadmin, dan hanya kalau transaksi ini belum pernah dibayar
+        // sama sekali. Kalau sudah ada pembayaran, transaksi dianggap final —
+        // tolak di sini duluan (403) sebelum sempat masuk ke Service.
+        return $this->user()->isSuperadmin()
+            && $this->route('salesOrder')?->canBeModified();
     }
 
     public function rules(): array
     {
         return [
-            'supplier_id'   => ['required', 'exists:suppliers,id'],
-            'po_date'       => ['required', 'date'],
+            'customer_id'   => ['required', 'exists:customers,id'],
+            'so_date'       => ['required', 'date'],
             'note'          => ['nullable', 'string', 'max:1000'],
+            'source'        => ['required', Rule::in(array_keys(SalesOrder::SOURCES))],
 
             'items'                    => ['required', 'array', 'min:1'],
             'items.*.product_id'       => ['required', 'exists:products,id'],
             'items.*.qty'              => ['required', 'integer', 'min:1'],
-            'items.*.buy_price'        => ['required', 'numeric', 'min:0'],
-
-            'initial_payment'          => ['nullable', 'numeric', 'min:0'],
-            'payment_method'           => ['nullable', 'in:cash,transfer,other'],
+            'items.*.sell_price'       => ['required', 'numeric', 'min:0'],
         ];
     }
 
     public function withValidator($validator): void
     {
-        // Satu produk cuma boleh muncul di 1 baris item — sama seperti aturan di SO.
-        // Dicek juga di sini (bukan cuma di form JS) supaya request yang dikirim
-        // langsung tanpa lewat form tetap ditolak.
         $validator->after(function ($validator) {
             $productIds = collect($this->input('items', []))->pluck('product_id')->filter();
 
@@ -46,8 +46,8 @@ class StorePurchaseOrderRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'items.required'   => 'Minimal harus ada 1 item barang dalam PO.',
-            'items.*.qty.min'  => 'Qty barang minimal 1.',
+            'items.required'  => 'Minimal harus ada 1 item barang dalam transaksi.',
+            'items.*.qty.min' => 'Qty barang minimal 1.',
         ];
     }
 }

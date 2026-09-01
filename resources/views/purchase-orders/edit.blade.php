@@ -1,27 +1,35 @@
 @extends('layouts.app')
 
-@section('page-title', 'Buat Purchase Order')
+@section('page-title', 'Edit Purchase Order')
 
 @section('content')
 <div
-    x-data="poCreateForm(
+    x-data="poEditForm(
         {{ Illuminate\Support\Js::from($suppliers) }},
         {{ Illuminate\Support\Js::from($products) }},
-        {{ Illuminate\Support\Js::from(old('items', [['product_id' => '', 'qty' => 1, 'buy_price' => '']])) }}
+        {{ Illuminate\Support\Js::from(old('items', $purchaseOrder->items->map(fn ($item) => [
+            'product_id' => $item->product_id,
+            'qty'        => $item->qty,
+            'buy_price'  => $item->buy_price,
+        ])->values())) }}
     )"
     x-cloak
 >
     <div class="mb-6">
-        <a href="{{ route('purchase-orders.index') }}" class="text-sm text-ink/50 hover:text-ink inline-flex items-center gap-1 mb-2">
+        <a href="{{ route('purchase-orders.show', $purchaseOrder) }}" class="text-sm text-ink/50 hover:text-ink inline-flex items-center gap-1 mb-2">
             <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-            Kembali ke daftar PO
+            Kembali ke detail PO
         </a>
-        <h2 class="text-2xl font-display font-semibold tracking-tight">Buat Purchase Order</h2>
-        <p class="text-sm text-ink/50 mt-1">Barang akan langsung masuk stok begitu PO disimpan, terlepas dari status pembayaran.</p>
+        <h2 class="text-2xl font-display font-semibold tracking-tight tnum">Edit {{ $purchaseOrder->po_number }}</h2>
+        <p class="text-sm text-ink/50 mt-1">
+            PO ini belum ada pembayaran, jadi masih bisa diedit bebas. Stok lama akan dilepas
+            dan diganti stok baru sesuai perubahan item.
+        </p>
     </div>
 
-    <form method="POST" action="{{ route('purchase-orders.store') }}">
+    <form method="POST" action="{{ route('purchase-orders.update', $purchaseOrder) }}">
         @csrf
+        @method('PUT')
 
         {{-- Info utama --}}
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6 mb-6">
@@ -41,7 +49,7 @@
 
                 <div>
                     <label class="block text-sm font-medium mb-1.5">Tanggal PO</label>
-                    <input type="date" name="po_date" value="{{ old('po_date', now()->toDateString()) }}"
+                    <input type="date" name="po_date" value="{{ old('po_date', $purchaseOrder->po_date->toDateString()) }}"
                            class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
                     @error('po_date')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
                 </div>
@@ -50,7 +58,7 @@
             <div class="mt-4">
                 <label class="block text-sm font-medium mb-1.5">Catatan</label>
                 <textarea name="note" rows="2" placeholder="Opsional"
-                          class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">{{ old('note') }}</textarea>
+                          class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">{{ old('note', $purchaseOrder->note) }}</textarea>
                 @error('note')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
             </div>
         </div>
@@ -123,42 +131,14 @@
             </div>
         </div>
         @error('items')<p class="text-xs text-red-600 -mt-4 mb-6">{{ $message }}</p>@enderror
-
-        {{-- Pembayaran awal --}}
-        <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6 mb-6">
-            <h3 class="font-display font-semibold mb-1">Pembayaran Awal</h3>
-            <p class="text-xs text-ink/50 mb-4">Opsional — kosongkan kalau belum ada pembayaran sama sekali (status akan "Belum Bayar").</p>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1.5">Jumlah Dibayar</label>
-                    <div class="relative">
-                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-ink/40">Rp</span>
-                        <input type="text" inputmode="numeric"
-                               :value="formatRupiah(initialPayment)"
-                               @input="initialPayment = parseRupiah($event.target.value); $event.target.value = formatRupiah(initialPayment)"
-                               class="w-full rounded-xl border border-ink/12 pl-9 pr-3.5 py-2.5 text-sm tnum focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
-                        <input type="hidden" name="initial_payment" :value="initialPayment">
-                    </div>
-                    @error('initial_payment')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1.5">Metode Pembayaran</label>
-                    <select name="payment_method" x-model="paymentMethod"
-                            class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
-                        <option value="cash">Tunai</option>
-                        <option value="transfer">Transfer</option>
-                        <option value="other">Lainnya</option>
-                    </select>
-                </div>
-            </div>
-        </div>
+        @error('error')<p class="text-xs text-red-600 -mt-4 mb-6">{{ $message }}</p>@enderror
 
         <div class="flex justify-end gap-3">
-            <a href="{{ route('purchase-orders.index') }}"
+            <a href="{{ route('purchase-orders.show', $purchaseOrder) }}"
                class="text-sm font-medium px-5 py-2.5 rounded-xl border border-ink/12 hover:bg-ink/[0.03] transition-colors">Batal</a>
             <button type="submit"
                     class="text-sm font-semibold px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-ink shadow-glow hover:brightness-105 active:scale-[0.98] transition-all">
-                Simpan PO
+                Simpan Perubahan
             </button>
         </div>
     </form>
@@ -167,7 +147,7 @@
 
 @push('scripts')
 <script>
-    function poCreateForm(suppliers, products, initialItems) {
+    function poEditForm(suppliers, products, initialItems) {
         return {
             suppliers,
             products,
@@ -177,8 +157,6 @@
                 qty: i.qty || 1,
                 buy_price: i.buy_price || '',
             })),
-            initialPayment: {{ (int) old('initial_payment', 0) }} || '',
-            paymentMethod: '{{ old('payment_method', 'cash') }}',
 
             addItem() {
                 this.items.push({ key: Math.random().toString(36).slice(2), product_id: '', qty: 1, buy_price: '' });
@@ -202,13 +180,9 @@
                 $(el).select2({
                     placeholder: '— Pilih supplier —',
                     width: '100%',
-                    // dropdownParent HARUS body, bukan wrapper lokal — beberapa select
-                    // (mis. produk di "Item Barang") ada di dalam card yang overflow-hidden
-                    // (buat kliping sudut rounded), jadi dropdown select2 ikut kepotong
-                    // kalau dropdownParent-nya masih di dalam card itu.
                     dropdownParent: $('body'),
                 });
-                const old = {{ Illuminate\Support\Js::from(old('supplier_id', '')) }};
+                const old = {{ Illuminate\Support\Js::from(old('supplier_id', $purchaseOrder->supplier_id)) }};
                 if (old) this.$nextTick(() => $(el).val(String(old)).trigger('change.select2'));
             },
 

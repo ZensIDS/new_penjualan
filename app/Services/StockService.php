@@ -119,6 +119,8 @@ class StockService
      */
     public function reverseAllocations(iterable $allocations, string $movementDate, string $note = 'Retur/pembatalan penjualan'): void
     {
+        $affectedProductIds = [];
+
         foreach ($allocations as $allocation) {
             $batch = $allocation->stockBatch;
             $batch->qty_remaining += $allocation->qty_taken;
@@ -134,11 +136,57 @@ class StockService
                 'reference_id'    => $allocation->sale_item_id,
                 'note'            => $note,
             ]);
+
+            $affectedProductIds[$batch->product_id] = true;
         }
 
-        if (isset($batch)) {
-            $this->syncProductQtyOnHand($batch->product_id);
+        // Sync qty_on_hand untuk SETIAP produk yang batch-nya kena, bukan cuma
+        // produk dari alokasi terakhir — 1 SO bisa berisi banyak produk berbeda.
+        foreach (array_keys($affectedProductIds) as $productId) {
+            $this->syncProductQtyOnHand($productId);
         }
+    }
+
+    /**
+     * Cek apakah batch stok hasil 1 baris PO item sudah kepakai (terjual)
+     * sebagian atau seluruhnya. Dipakai buat menolak edit/hapus PO yang
+     * barangnya sudah kadung terjual, walau PO itu sendiri belum dibayar
+     * sama sekali (status pembayaran & pergerakan stok itu dua hal terpisah).
+     */
+    public function isPurchaseItemBatchUsed(PurchaseOrderItem $item): bool
+    {
+        $batch = $item->stockBatch;
+
+        if (! $batch) {
+            return false;
+        }
+
+        return $batch->qty_remaining < $batch->qty_in;
+    }
+
+    /**
+     * Hapus 1 batch stok hasil PO item beserta jejak stock_movements-nya,
+     * lalu sync ulang qty_on_hand produknya. HANYA boleh dipanggil kalau
+     * isPurchaseItemBatchUsed() sudah dipastikan false (batch belum kepakai
+     * sama sekali) — dicek di pemanggil (PurchaseOrderService).
+     */
+    public function removeUnusedPurchaseBatch(PurchaseOrderItem $item): void
+    {
+        $batch = $item->stockBatch;
+
+        if (! $batch) {
+            return;
+        }
+
+        $productId = $batch->product_id;
+
+        StockMovement::where('reference_type', 'purchase_order_item')
+            ->where('reference_id', $item->id)
+            ->delete();
+
+        $batch->delete();
+
+        $this->syncProductQtyOnHand($productId);
     }
 
     /**
