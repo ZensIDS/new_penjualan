@@ -195,7 +195,12 @@ class ReportService
                 'paid_amount'       => (float) $po->paid_amount,
                 'remaining_balance' => (float) $po->remaining_balance,
                 'payment_status'    => $po->payment_status,
-                'payment_history'   => $po->payments,
+                'payment_history'   => $po->payments->map(fn($p) => [
+                    'payment_date' => $p->payment_date->format('Y-m-d'),
+                    'amount'       => (float) $p->amount,
+                    'method'       => $p->method,
+                    'note'         => $p->note,
+                ]),
             ]);
     }
 
@@ -216,7 +221,12 @@ class ReportService
                 'paid_amount'       => (float) $so->paid_amount,
                 'remaining_balance' => (float) $so->remaining_balance,
                 'payment_status'    => $so->payment_status,
-                'payment_history'   => $so->payments,
+                'payment_history'   => $so->payments->map(fn($p) => [
+                    'payment_date' => $p->payment_date->format('Y-m-d'),
+                    'amount'       => (float) $p->amount,
+                    'method'       => $p->method,
+                    'note'         => $p->note,
+                ]),
             ]);
     }
 }
