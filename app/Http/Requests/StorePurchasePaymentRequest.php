@@ -8,7 +8,8 @@ class StorePurchasePaymentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return in_array($this->user()->role, ['admin', 'finance']);
+        // Hanya superadmin yang boleh input pembayaran PO. Viewer hanya boleh melihat.
+        return $this->user()->isSuperadmin();
     }
 
     public function rules(): array

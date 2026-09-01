@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StorePurchaseOrderRequest;
 use App\Http\Requests\StorePurchasePaymentRequest;
+use App\Models\Product;
 use App\Models\PurchaseOrder;
+use App\Models\Supplier;
 use App\Services\PurchaseOrderService;
 use Illuminate\Http\JsonResponse;
 
@@ -20,6 +22,17 @@ class PurchaseOrderController extends Controller
 
         return view('purchase-orders.index', compact('purchaseOrders'));
         // Kalau API: return response()->json($purchaseOrders);
+    }
+
+    public function create()
+    {
+        $suppliers = Supplier::orderBy('name')->get(['id', 'name']);
+
+        $products = Product::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'unit', 'qty_on_hand']);
+
+        return view('purchase-orders.create', compact('suppliers', 'products'));
     }
 
     public function show(PurchaseOrder $purchaseOrder)

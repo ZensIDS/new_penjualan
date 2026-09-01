@@ -10,6 +10,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SalesOrderController;
+use App\Http\Controllers\StockController;
 use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
 
@@ -28,6 +29,13 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
+    // Route 'create' WAJIB didaftarkan sebelum resource(['index','show']) di bawah ini,
+    // supaya path /purchase-orders/create tidak ketangkep duluan oleh wildcard
+    // /purchase-orders/{purchaseOrder} milik route 'show'.
+    Route::get('purchase-orders/create', [PurchaseOrderController::class, 'create'])
+        ->middleware('role:superadmin')
+        ->name('purchase-orders.create');
+
     Route::resource('purchase-orders', PurchaseOrderController::class)
         ->only(['index', 'show']);
 
@@ -36,6 +44,7 @@ Route::middleware('auth')->group(function () {
 
     // Modul di bawah ini pakai pola index + modal (create/edit AJAX),
     // jadi cuma butuh route 'index' — store/update/destroy ada di grup superadmin.
+    Route::get('stock', [StockController::class, 'index'])->name('stock.index');
     Route::get('products', [ProductController::class, 'index'])->name('products.index');
     Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
     Route::get('suppliers', [SupplierController::class, 'index'])->name('suppliers.index');

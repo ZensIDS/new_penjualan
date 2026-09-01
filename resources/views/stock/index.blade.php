@@ -1,0 +1,133 @@
+@extends('layouts.app')
+
+@section('page-title', 'Stok')
+
+@section('content')
+<div x-data="stockPage({{ Illuminate\Support\Js::from($stock) }})" x-cloak>
+
+    {{-- KPI --}}
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
+            <p class="text-xs font-medium text-ink/50 mb-2 uppercase tracking-wide">Produk Terdaftar</p>
+            <p class="font-display font-semibold text-2xl tnum" x-text="items.length"></p>
+        </div>
+        <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
+            <p class="text-xs font-medium text-ink/50 mb-2 uppercase tracking-wide">Total Unit Stok</p>
+            <p class="font-display font-semibold text-2xl tnum" x-text="totalQty.toLocaleString('id-ID')"></p>
+        </div>
+        <div class="rounded-2xl bg-gradient-to-br from-ink to-[#0a0a0b] text-white shadow-panel p-6">
+            <p class="text-xs font-medium text-white/50 mb-2 uppercase tracking-wide">Total Nilai Stok</p>
+            <p class="font-display font-semibold text-2xl tnum text-amber-400" x-text="'Rp ' + rp(totalValue)"></p>
+        </div>
+    </div>
+
+    {{-- Search --}}
+    <div class="flex items-center justify-between mb-4 gap-3">
+        <div class="relative flex-1 max-w-sm">
+            <svg viewBox="0 0 24 24" class="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink/35" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="m21 21-4.3-4.3"/></svg>
+            <input type="text" x-model="search" placeholder="Cari nama produk..."
+                   class="w-full rounded-xl border border-ink/12 pl-10 pr-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+        </div>
+        <a href="{{ route('reports.stock') }}" class="text-sm font-medium text-ink/50 hover:text-ink whitespace-nowrap">
+            Versi laporan &rarr;
+        </a>
+    </div>
+
+    {{-- Daftar produk (klik untuk expand breakdown batch) --}}
+    <div class="rounded-2xl border border-ink/10 bg-white shadow-card divide-y divide-ink/[0.06] overflow-hidden">
+        <template x-for="p in filtered" :key="p.product_id">
+            <div>
+                <button
+                    type="button"
+                    @click="p.open = !p.open"
+                    class="w-full flex items-center justify-between gap-4 px-5 py-4 hover:bg-amber-50/40 transition-colors text-left"
+                >
+                    <div class="flex items-center gap-3 min-w-0">
+                        <svg viewBox="0 0 24 24" class="h-4 w-4 shrink-0 text-ink/40 transition-transform"
+                             :class="p.open ? 'rotate-90' : ''"
+                             fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 6l6 6-6 6"/>
+                        </svg>
+                        <div class="min-w-0">
+                            <p class="font-medium truncate" x-text="p.name"></p>
+                            <p class="text-xs text-ink/40" x-text="p.category || '—'"></p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 sm:gap-6 shrink-0">
+                        <span class="inline-flex items-center justify-center min-w-[2.5rem] rounded-full px-2.5 py-1 text-xs font-semibold tnum"
+                              :class="badgeClass(p.total_qty)" x-text="p.total_qty"></span>
+                        <span class="text-sm font-medium tnum w-28 sm:w-32 text-right" x-text="'Rp ' + rp(p.stock_value)"></span>
+                    </div>
+                </button>
+
+                <div x-show="p.open" x-transition class="px-5 pb-4 pl-12">
+                    <template x-if="p.batches.length === 0">
+                        <p class="text-xs text-ink/40 py-2">Tidak ada batch stok tersisa untuk produk ini.</p>
+                    </template>
+                    <template x-if="p.batches.length > 0">
+                        <table class="w-full text-xs">
+                            <thead>
+                                <tr class="text-ink/40 text-left">
+                                    <th class="py-1.5 font-medium">Tgl Masuk</th>
+                                    <th class="py-1.5 font-medium text-right">Harga Beli</th>
+                                    <th class="py-1.5 font-medium text-right">Qty Masuk</th>
+                                    <th class="py-1.5 font-medium text-right">Sisa</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-ink/[0.05]">
+                                <template x-for="(b, i) in p.batches" :key="i">
+                                    <tr>
+                                        <td class="py-1.5 tnum" x-text="b.batch_date"></td>
+                                        <td class="py-1.5 tnum text-right" x-text="'Rp ' + rp(b.buy_price)"></td>
+                                        <td class="py-1.5 tnum text-right" x-text="b.qty_in"></td>
+                                        <td class="py-1.5 tnum text-right font-medium" x-text="b.qty_remaining"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <template x-if="filtered.length === 0">
+            <p class="px-5 py-10 text-center text-ink/40 text-sm">Tidak ada produk yang cocok dengan pencarian.</p>
+        </template>
+    </div>
+</div>
+@endsection
+
+@push('scripts')
+<script>
+    function stockPage(initialStock) {
+        return {
+            items: initialStock.map(p => ({ ...p, open: false })),
+            search: '',
+
+            get filtered() {
+                const q = this.search.trim().toLowerCase();
+                if (!q) return this.items;
+                return this.items.filter(p => p.name.toLowerCase().includes(q));
+            },
+
+            get totalQty() {
+                return this.items.reduce((sum, p) => sum + p.total_qty, 0);
+            },
+
+            get totalValue() {
+                return this.items.reduce((sum, p) => sum + p.stock_value, 0);
+            },
+
+            rp(value) {
+                return new Intl.NumberFormat('id-ID').format(Math.round(value || 0));
+            },
+
+            badgeClass(qty) {
+                if (qty == 0) return 'bg-red-100 text-red-700';
+                if (qty <= 5) return 'bg-amber-100 text-amber-800';
+                return 'bg-emerald-100 text-emerald-700';
+            },
+        };
+    }
+</script>
+@endpush

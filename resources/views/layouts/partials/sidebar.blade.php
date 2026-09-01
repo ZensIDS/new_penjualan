@@ -8,6 +8,7 @@
             ['label' => 'Supplier', 'route' => 'suppliers.index', 'pattern' => 'suppliers.*'],
         ],
         'Persediaan' => [
+            ['label' => 'Stok', 'route' => 'stock.index', 'pattern' => 'stock.*'],
             ['label' => 'Produk', 'route' => 'products.index', 'pattern' => 'products.*'],
             ['label' => 'Kategori', 'route' => 'categories.index', 'pattern' => 'categories.*'],
         ],

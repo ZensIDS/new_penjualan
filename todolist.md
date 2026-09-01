@@ -1,8 +1,15 @@
 # TODO — Sistem Inventaris, Operasional & Keuangan
 
 Terakhir diupdate: CRUD Product, Category, Supplier, Customer, Expense, ExpenseCategory sudah
-selesai end-to-end (Controller JSON + view index dengan modal Alpine.js/AJAX). Sisa Fase 8:
-form input PO/SO (dynamic item baris), halaman detail PO/SO, dan halaman laporan.
+selesai end-to-end (Controller JSON + view index dengan modal Alpine.js/AJAX). PO (index, form
+input dengan item baris dinamis, halaman detail + form pembayaran) dan halaman Stok (view cek
+cepat, terpisah dari Laporan Stok formal) sudah jadi. Sisa Fase 8: form input SO + halaman
+detail SO, dan halaman-halaman laporan.
+
+**Bug fix saat ini:** `StorePurchasePaymentRequest` & `StoreSalesPaymentRequest` masih mengecek
+role lama (`admin`/`finance`/`kasir`) di `authorize()`, padahal sistem role sekarang cuma
+`superadmin`/`viewer` — akibatnya endpoint tambah pembayaran selalu 403 walau route sudah
+dijaga `role:superadmin`. Sudah diperbaiki jadi `$this->user()->isSuperadmin()`.
 
 ## ✅ Fase 1 — Database (Migration)
 
@@ -74,9 +81,22 @@ form input PO/SO (dynamic item baris), halaman detail PO/SO, dan halaman laporan
 - [x] Topbar (`layouts/partials/topbar.blade.php`) — hamburger mobile + judul halaman
 - [x] Halaman login (`auth/login.blade.php`) — desain 2 kolom, standalone (tanpa sidebar)
 - [x] Dashboard (`dashboard.blade.php`) — KPI, ringkasan laba rugi, piutang/hutang, stok menipis
-- [ ] Form input PO (dynamic add item baris) — pakai layout master yang sudah ada
+- [x] `PurchaseOrderController::create()` + route `purchase-orders.create` (didaftarkan
+      SEBELUM `resource(['index','show'])` supaya path literal `/create` tidak ketangkep
+      wildcard `{purchaseOrder}` milik route `show`)
+- [x] Halaman index PO (`purchase-orders/index.blade.php`) — tabel + status badge + link detail
+- [x] Form input PO (`purchase-orders/create.blade.php`) — dynamic add/remove item baris pakai
+      Alpine, select2 per baris (produk + supplier), input Rupiah terformat, form submit biasa
+      (bukan AJAX, sesuai pola controller yang redirect/back()->withErrors())
 - [ ] Form input SO (dynamic add item baris, tampilkan stok tersedia per produk)
-- [ ] Halaman detail PO/SO (breakdown batch, histori pembayaran)
+- [x] Halaman detail PO (`purchase-orders/show.blade.php`) — breakdown item + sisa batch,
+      ringkasan pembayaran, riwayat pembayaran, form tambah pembayaran (superadmin, muncul
+      kalau masih ada sisa hutang)
+- [ ] Halaman detail SO (breakdown batch FIFO yang kepakai, histori pembayaran)
+- [x] Halaman Stok (`stock/index.blade.php`, route `stock.index`, menu "Persediaan → Stok") —
+      view cek cepat: search instan nama produk (client-side), expand/collapse breakdown batch
+      per produk, KPI ringkas. Data dari `ReportService::stockReport()` yang sama dipakai
+      `reports.stock`, cuma tampilannya beda (operasional harian vs laporan formal)
 - [x] Halaman index untuk Product, Category, Supplier, Customer, Expense, ExpenseCategory —
       1 view per modul, create/edit pakai modal Alpine.js + AJAX (bukan halaman terpisah),
       konsisten dengan token desain (border tipis, bukan shadow). Controller-nya sekarang
