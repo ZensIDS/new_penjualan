@@ -8,8 +8,8 @@ class StoreSalesOrderRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Kasir & admin boleh input penjualan
-        return in_array($this->user()->role, ['admin', 'kasir']);
+        // Hanya superadmin yang boleh input penjualan. Viewer hanya boleh melihat.
+        return $this->user()->isSuperadmin();
     }
 
     public function rules(): array

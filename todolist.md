@@ -1,6 +1,8 @@
 # TODO — Sistem Inventaris, Operasional & Keuangan
 
-Terakhir diupdate: tahap Laporan (Reports) selesai dibuat.
+Terakhir diupdate: CRUD Product, Category, Supplier, Customer, Expense, ExpenseCategory sudah
+selesai end-to-end (Controller JSON + view index dengan modal Alpine.js/AJAX). Sisa Fase 8:
+form input PO/SO (dynamic item baris), halaman detail PO/SO, dan halaman laporan.
 
 ## ✅ Fase 1 — Database (Migration)
 
@@ -25,6 +27,11 @@ Terakhir diupdate: tahap Laporan (Reports) selesai dibuat.
       `PurchaseOrder`, `PurchaseOrderItem`, `StockBatch`, `PurchasePayment`,
       `SalesOrder`, `SaleItem`, `SaleItemAllocation`, `SalesPayment`,
       `ExpenseCategory`, `Expense`, `StockMovement`, `CashFlow`, `User`)
+- [x] Standar: kolom `decimal` (uang) di-cast `'amount' => 'decimal:2'` dst di semua model
+      supaya konsisten sebagai angka, bukan string mentah dari MySQL — **wajib diikuti**
+      kalau nambah kolom uang baru di model manapun nanti.
+- [x] `Category`, `Customer`, `Supplier`, `ExpenseCategory` sengaja tetap minimal
+      (murni master data, tanpa logika) — bukan kelupaan.
 
 ## ✅ Fase 4 — Service Layer (Logika Bisnis Inti)
 
@@ -40,9 +47,13 @@ Terakhir diupdate: tahap Laporan (Reports) selesai dibuat.
 - [x] `PurchaseOrderController` + `StorePurchaseOrderRequest` + `StorePurchasePaymentRequest`
 - [x] `SalesOrderController` + `StoreSalesOrderRequest` + `StoreSalesPaymentRequest`
 - [x] Routes snippet siap tempel ke `routes/web.php`
-- [ ] `ProductController`, `CategoryController` (CRUD sederhana, pola sama seperti contoh di atas)
-- [ ] `SupplierController`, `CustomerController` (CRUD sederhana)
-- [ ] `ExpenseController`, `ExpenseCategoryController` (CRUD sederhana + pakai `ExpenseService`)
+- [x] `ProductController`, `CategoryController` (CRUD lengkap, pola sama seperti contoh di atas)
+- [x] `SupplierController`, `CustomerController` (CRUD lengkap)
+- [x] `ExpenseController`, `ExpenseCategoryController` (CRUD lengkap + pakai `ExpenseService`,
+      termasuk `ExpenseService::update()`/`delete()` baru supaya `cash_flows` tetap sinkron)
+- [x] `routes/web.php` sudah full diupdate dengan resource routes 6 controller di atas
+      (index/show di grup `auth`, create/store/edit/update/destroy di grup `role:superadmin`)
+- [x] Model `Category`, `Supplier`, `Customer`, `ExpenseCategory` ditambahkan `$fillable` + relasi yang dibutuhkan controller (`products()`, `purchaseOrders()`, `salesOrders()`, `expenses()`)
 
 ## ✅ Fase 6 — Laporan (Reports)
 
@@ -50,18 +61,28 @@ Terakhir diupdate: tahap Laporan (Reports) selesai dibuat.
 - [x] `ReportController` + routes
 - [ ] View/Blade untuk tiap laporan (atau export Excel/PDF kalau dibutuhkan)
 
-## ⬜ Fase 7 — Autentikasi & Otorisasi
+## ✅ Fase 7 — Autentikasi & Otorisasi
 
-- [ ] Setup Laravel Breeze/Fortify dengan login `username` (bukan email) — sesuaikan `config/auth.php`
-- [ ] Middleware/gate berdasarkan `role` (admin/kasir/gudang/finance) untuk membatasi akses menu
+- [x] `AuthController` (login/logout) + `LoginRequest` (login pakai `username`, dengan rate-limit)
+- [x] `EnsureUserHasRole` middleware (pakai: `->middleware('role:admin,finance')`)
+- [x] Daftarkan middleware `role` di Kernel.php (manual, lihat `AUTH_SETUP.md`)
 
-## ⬜ Fase 8 — Views / Frontend
+## 🟡 Fase 8 — Views / Frontend (sebagian selesai)
 
-- [ ] Layout dasar (sidebar menu: Pembelian, Stok, Penjualan, Operasional, Laporan)
-- [ ] Form input PO (dynamic add item baris)
+- [x] Layout master `layouts/app.blade.php` — semua view lain wajib `@extends` dari sini
+- [x] Sidebar (`layouts/partials/sidebar.blade.php`) — grup menu semua modul, responsive (drawer di mobile)
+- [x] Topbar (`layouts/partials/topbar.blade.php`) — hamburger mobile + judul halaman
+- [x] Halaman login (`auth/login.blade.php`) — desain 2 kolom, standalone (tanpa sidebar)
+- [x] Dashboard (`dashboard.blade.php`) — KPI, ringkasan laba rugi, piutang/hutang, stok menipis
+- [ ] Form input PO (dynamic add item baris) — pakai layout master yang sudah ada
 - [ ] Form input SO (dynamic add item baris, tampilkan stok tersedia per produk)
 - [ ] Halaman detail PO/SO (breakdown batch, histori pembayaran)
-- [ ] Dashboard ringkasan (total stok, piutang jatuh tempo, laba bulan ini, dll)
+- [x] Halaman index untuk Product, Category, Supplier, Customer, Expense, ExpenseCategory —
+      1 view per modul, create/edit pakai modal Alpine.js + AJAX (bukan halaman terpisah),
+      konsisten dengan token desain (border tipis, bukan shadow). Controller-nya sekarang
+      return JSON untuk store/update/destroy (route create/edit dihapus dari `routes/web.php`
+      karena tidak dipakai lagi).
+- [ ] Halaman laporan (Stok, Laba Rugi, Cash Flow, AP/AR) — Controller & Service sudah siap, tinggal buat view-nya
 
 ## ⬜ Fase 9 — Data Pendukung
 

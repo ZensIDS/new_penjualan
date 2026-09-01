@@ -24,7 +24,6 @@ class ReportService
             ->map(function (Product $product) {
                 return [
                     'product_id'   => $product->id,
-                    'sku'          => $product->sku,
                     'name'         => $product->name,
                     'category'     => $product->category->name ?? null,
                     'total_qty'    => $product->qty_on_hand,

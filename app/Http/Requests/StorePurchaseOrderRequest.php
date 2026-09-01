@@ -8,8 +8,8 @@ class StorePurchaseOrderRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Sesuaikan dengan role: hanya admin & finance yang boleh input PO
-        return in_array($this->user()->role, ['admin', 'finance']);
+        // Hanya superadmin yang boleh input PO. Viewer hanya boleh melihat.
+        return $this->user()->isSuperadmin();
     }
 
     public function rules(): array
