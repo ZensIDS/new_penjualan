@@ -2,10 +2,36 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class SaleItem extends Model
 {
-    use HasFactory;
+    protected $fillable = [
+        'sales_order_id',
+        'product_id',
+        'qty',
+        'sell_price',
+        'subtotal',
+        'hpp_subtotal',
+    ];
+
+    public function salesOrder()
+    {
+        return $this->belongsTo(SalesOrder::class);
+    }
+
+    public function product()
+    {
+        return $this->belongsTo(Product::class);
+    }
+
+    public function allocations()
+    {
+        return $this->hasMany(SaleItemAllocation::class);
+    }
+
+    public function getMarginAttribute(): float
+    {
+        return (float) $this->subtotal - (float) $this->hpp_subtotal;
+    }
 }

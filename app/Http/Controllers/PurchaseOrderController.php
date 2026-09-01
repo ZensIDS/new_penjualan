@@ -1,0 +1,75 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\StorePurchaseOrderRequest;
+use App\Http\Requests\StorePurchasePaymentRequest;
+use App\Models\PurchaseOrder;
+use App\Services\PurchaseOrderService;
+use Illuminate\Http\JsonResponse;
+
+class PurchaseOrderController extends Controller
+{
+    public function __construct(protected PurchaseOrderService $service) {}
+
+    public function index()
+    {
+        $purchaseOrders = PurchaseOrder::with('supplier')
+            ->latest('po_date')
+            ->paginate(20);
+
+        return view('purchase-orders.index', compact('purchaseOrders'));
+        // Kalau API: return response()->json($purchaseOrders);
+    }
+
+    public function show(PurchaseOrder $purchaseOrder)
+    {
+        $purchaseOrder->load(['supplier', 'items.product', 'items.stockBatch', 'payments']);
+
+        return view('purchase-orders.show', compact('purchaseOrder'));
+    }
+
+    public function store(StorePurchaseOrderRequest $request)
+    {
+        $validated = $request->validated();
+
+        try {
+            $po = $this->service->create(
+                data: [
+                    'supplier_id' => $validated['supplier_id'],
+                    'po_date'     => $validated['po_date'],
+                    'note'        => $validated['note'] ?? null,
+                ],
+                items: $validated['items'],
+                initialPayment: $validated['initial_payment'] ?? null,
+                paymentMethod: $validated['payment_method'] ?? 'cash',
+            );
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['error' => $e->getMessage()])->withInput();
+            // Kalau API: return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return redirect()
+            ->route('purchase-orders.show', $po)
+            ->with('success', "PO {$po->po_number} berhasil dibuat.");
+    }
+
+    public function storePayment(StorePurchasePaymentRequest $request, PurchaseOrder $purchaseOrder)
+    {
+        $validated = $request->validated();
+
+        try {
+            $this->service->addPayment(
+                po: $purchaseOrder,
+                date: $validated['payment_date'],
+                amount: $validated['amount'],
+                method: $validated['method'],
+                note: $validated['note'] ?? null,
+            );
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Pembayaran berhasil dicatat.');
+    }
+}
