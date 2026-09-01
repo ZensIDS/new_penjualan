@@ -165,11 +165,13 @@
                                     <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-ink/40">Rp</span>
                                     <input type="text" inputmode="numeric"
                                            :value="formatRupiah(amount)"
-                                           @input="amount = parseRupiah($event.target.value); $event.target.value = formatRupiah(amount)"
+                                           @input="setAmount(parseRupiah($event.target.value)); $event.target.value = formatRupiah(amount)"
                                            class="w-full rounded-xl border border-ink/12 pl-9 pr-3.5 py-2.5 text-sm tnum focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
                                     <input type="hidden" name="amount" :value="amount">
                                 </div>
-                                <p class="text-xs text-ink/40 mt-1">Sisa hutang: Rp <span x-text="formatRupiah(remaining)"></span></p>
+                                <p class="text-xs mt-1" :class="amount === remaining ? 'text-amber-700 font-medium' : 'text-ink/40'">
+                                    Sisa hutang: Rp <span x-text="formatRupiah(remaining)"></span>
+                                </p>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium mb-1.5">Metode</label>
@@ -203,7 +205,12 @@
         return {
             remaining,
             amount: '',
-            useMax() { this.amount = this.remaining; },
+            // Cegah input nominal pembayaran melebihi sisa hutang — kalau user ngetik
+            // lebih besar dari sisa, otomatis dipangkas balik ke batas maksimalnya.
+            setAmount(value) {
+                this.amount = value === '' ? '' : Math.min(value, this.remaining);
+            },
+            useMax() { this.setAmount(this.remaining); },
         };
     }
 </script>

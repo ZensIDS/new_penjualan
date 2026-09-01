@@ -7,6 +7,7 @@ use App\Http\Requests\StoreSalesPaymentRequest;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\SalesOrder;
+use App\Models\StockBatch;
 use App\Services\SalesOrderService;
 
 class SalesOrderController extends Controller
@@ -33,6 +34,21 @@ class SalesOrderController extends Controller
         $products = Product::where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'unit', 'qty_on_hand']);
+
+        // Harga beli acuan tiap produk = harga beli batch TERTUA yang masih ada
+        // sisa stok — itu batch yang bakal benar-benar kepakai duluan kalau produk
+        // ini dijual (sesuai urutan FIFO). Dipakai di form (JS) buat alert kalau
+        // harga jual ditulis di bawah harga beli, bukan buat disimpan ke SO.
+        $nextBuyPrices = StockBatch::where('qty_remaining', '>', 0)
+            ->orderBy('batch_date')
+            ->orderBy('id')
+            ->get(['product_id', 'buy_price'])
+            ->unique('product_id')
+            ->pluck('buy_price', 'product_id');
+
+        $products->each(function (Product $product) use ($nextBuyPrices) {
+            $product->next_buy_price = $nextBuyPrices->get($product->id);
+        });
 
         return view('sales-orders.create', compact('customers', 'products'));
     }

@@ -29,6 +29,19 @@ class StoreSalesOrderRequest extends FormRequest
         ];
     }
 
+    public function withValidator($validator): void
+    {
+        // Satu produk cuma boleh muncul di 1 baris item. Dicek juga di sini (bukan cuma
+        // di form JS) supaya request yang dikirim langsung tanpa lewat form tetap ditolak.
+        $validator->after(function ($validator) {
+            $productIds = collect($this->input('items', []))->pluck('product_id')->filter();
+
+            if ($productIds->count() !== $productIds->unique()->count()) {
+                $validator->errors()->add('items', 'Satu produk tidak boleh dipilih di lebih dari 1 baris item.');
+            }
+        });
+    }
+
     public function messages(): array
     {
         return [

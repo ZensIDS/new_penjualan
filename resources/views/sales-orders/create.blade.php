@@ -97,9 +97,15 @@
                                 <input type="text" inputmode="numeric"
                                        :value="formatRupiah(item.sell_price)"
                                        @input="item.sell_price = parseRupiah($event.target.value); $event.target.value = formatRupiah(item.sell_price)"
-                                       class="w-full rounded-xl border border-ink/12 pl-9 pr-3.5 py-2.5 text-sm tnum focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                                       class="w-full rounded-xl border pl-9 pr-3.5 py-2.5 text-sm tnum focus:outline-none focus:ring-4 transition-shadow"
+                                       :class="belowCost(item)
+                                            ? 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/15'
+                                            : 'border-ink/12 focus:border-amber-500 focus:ring-amber-500/15'">
                                 <input type="hidden" :name="'items['+index+'][sell_price]'" :value="item.sell_price">
                             </div>
+                            <p class="text-xs text-amber-700 font-medium mt-1" x-show="belowCost(item)" x-cloak>
+                                Di bawah harga beli (Rp <span x-text="formatRupiah(buyPriceFor(item.product_id))"></span>)
+                            </p>
                         </div>
 
                         <div class="sm:col-span-1">
@@ -197,22 +203,31 @@
                 return p ? p.qty_on_hand + ' ' + p.unit : '—';
             },
 
-            // Cek per baris terhadap stok produk itu sendiri. Kalau produk yang sama dipilih
-            // di lebih dari 1 baris, jumlahkan qty semua baris tersebut supaya tidak lolos
-            // validasi client-side dengan cara "membagi" qty ke beberapa baris. Batas final
-            // yang sesungguhnya tetap ditegakkan server-side lewat StockService::allocateFifo().
             exceedsStock(item) {
                 if (!item.product_id) return false;
                 const p = this.products.find(p => p.id == item.product_id);
                 if (!p) return false;
-                const totalQtyForProduct = this.items
-                    .filter(i => i.product_id == item.product_id)
-                    .reduce((sum, i) => sum + (parseInt(i.qty) || 0), 0);
-                return totalQtyForProduct > p.qty_on_hand;
+                return (parseInt(item.qty) || 0) > p.qty_on_hand;
             },
 
             get hasStockError() {
                 return this.items.some(i => this.exceedsStock(i));
+            },
+
+            // Harga beli acuan = harga beli batch tertua yang masih ada stok (batch yang
+            // bakal benar-benar kepakai duluan kalau produk ini dijual sekarang, sesuai FIFO).
+            buyPriceFor(productId) {
+                const p = this.products.find(p => p.id == productId);
+                return p && p.next_buy_price !== null && p.next_buy_price !== undefined
+                    ? parseFloat(p.next_buy_price)
+                    : null;
+            },
+
+            belowCost(item) {
+                if (!item.product_id || !item.sell_price) return false;
+                const buyPrice = this.buyPriceFor(item.product_id);
+                if (buyPrice === null) return false;
+                return parseFloat(item.sell_price) < buyPrice;
             },
 
             get total() {
@@ -222,6 +237,23 @@
             onSubmit(e) {
                 if (this.hasStockError) {
                     e.preventDefault();
+                    return;
+                }
+
+                const belowCostItems = this.items.filter(i => this.belowCost(i));
+                if (belowCostItems.length > 0) {
+                    const names = belowCostItems
+                        .map(i => (this.products.find(p => p.id == i.product_id) || {}).name)
+                        .filter(Boolean)
+                        .join(', ');
+                    const ok = confirm(
+                        'Harga jual untuk ' + names + ' ditulis di bawah harga beli, transaksi ini akan rugi. ' +
+                        'Lanjutkan simpan transaksi ini?'
+                    );
+                    if (!ok) {
+                        e.preventDefault();
+                        return;
+                    }
                 }
             },
 
@@ -229,23 +261,41 @@
                 $(el).select2({
                     placeholder: '— Pilih customer —',
                     width: '100%',
-                    dropdownParent: $(el).closest('.relative'),
+                    // dropdownParent HARUS body, bukan wrapper lokal — beberapa select
+                    // (mis. produk di "Item Barang") ada di dalam card yang overflow-hidden
+                    // (buat kliping sudut rounded), jadi dropdown select2 ikut kepotong
+                    // kalau dropdownParent-nya masih di dalam card itu.
+                    dropdownParent: $('body'),
                 });
                 const old = {{ Illuminate\Support\Js::from(old('customer_id', '')) }};
                 if (old) this.$nextTick(() => $(el).val(String(old)).trigger('change.select2'));
             },
 
             initProductSelect(el, item) {
+                const self = this;
                 $(el).select2({
                     placeholder: '— Pilih produk —',
                     width: '100%',
-                    dropdownParent: $(el).closest('.relative'),
+                    dropdownParent: $('body'),
                     data: this.products.map(p => ({
                         id: p.id,
                         text: p.name + ' (' + p.unit + ') — stok ' + p.qty_on_hand,
                         disabled: p.qty_on_hand <= 0,
                     })),
-                }).on('change', function () { item.product_id = $(this).val(); });
+                }).on('change', function () {
+                    const newVal = $(this).val();
+
+                    // 1 produk cuma boleh dipilih di 1 baris. Kalau produk yang baru dipilih
+                    // sudah dipakai di baris lain, batalkan pilihan & balikkan ke nilai
+                    // sebelumnya — tambah qty di baris yang sudah ada saja.
+                    if (newVal && self.items.some(i => i.key !== item.key && i.product_id == newVal)) {
+                        alert('Produk ini sudah dipilih di baris lain. Ubah qty di baris tersebut, atau pilih produk lain.');
+                        $(this).val(item.product_id || null).trigger('change.select2');
+                        return;
+                    }
+
+                    item.product_id = newVal;
+                });
 
                 if (item.product_id) {
                     this.$nextTick(() => $(el).val(String(item.product_id)).trigger('change.select2'));

@@ -202,7 +202,11 @@
                 $(el).select2({
                     placeholder: '— Pilih supplier —',
                     width: '100%',
-                    dropdownParent: $(el).closest('.relative'),
+                    // dropdownParent HARUS body, bukan wrapper lokal — beberapa select
+                    // (mis. produk di "Item Barang") ada di dalam card yang overflow-hidden
+                    // (buat kliping sudut rounded), jadi dropdown select2 ikut kepotong
+                    // kalau dropdownParent-nya masih di dalam card itu.
+                    dropdownParent: $('body'),
                 });
                 const old = {{ Illuminate\Support\Js::from(old('supplier_id', '')) }};
                 if (old) this.$nextTick(() => $(el).val(String(old)).trigger('change.select2'));
@@ -213,7 +217,7 @@
                 $(el).select2({
                     placeholder: '— Pilih produk —',
                     width: '100%',
-                    dropdownParent: $(el).closest('.relative'),
+                    dropdownParent: $('body'),
                 }).on('change', function () { item.product_id = $(this).val(); });
 
                 if (item.product_id) {
