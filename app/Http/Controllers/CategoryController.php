@@ -13,7 +13,7 @@ class CategoryController extends Controller
     {
         $categories = Category::withCount('products')
             ->orderBy('name')
-            ->paginate(20);
+            ->paginate(10);
 
         return view('categories.index', compact('categories'));
     }

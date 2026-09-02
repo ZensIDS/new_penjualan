@@ -13,7 +13,7 @@ class ProductController extends Controller
     {
         $products = Product::with('category')
             ->orderBy('name')
-            ->paginate(20);
+            ->paginate(10);
 
         $categories = Category::orderBy('name')->get(['id', 'name']);
 

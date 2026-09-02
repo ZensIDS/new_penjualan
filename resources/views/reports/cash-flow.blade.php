@@ -44,12 +44,16 @@
         </div>
     </div>
 
-    {{-- Daftar transaksi --}}
+    {{-- Daftar transaksi. Diurutkan dari server (transaction_date DESC, lalu
+         id DESC) supaya transaksi yang paling baru dicatat selalu tampil
+         paling atas — termasuk saat beberapa transaksi terjadi di tanggal
+         yang sama. Dipaginasi 25/halaman, terpisah dari agregat KPI & grafik
+         di atas yang tetap menghitung semua transaksi pada periode ini. --}}
     <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
         <div class="px-6 py-4 border-b border-ink/10">
             <h2 class="font-display font-semibold">Rincian Transaksi</h2>
         </div>
-        @if ($data['details']->isEmpty())
+        @if ($details->isEmpty())
             <p class="px-6 py-10 text-sm text-ink/40 text-center">Tidak ada transaksi kas pada periode ini.</p>
         @else
             <div class="overflow-x-auto">
@@ -63,7 +67,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-ink/[0.06]">
-                        @foreach ($data['details']->sortByDesc('transaction_date') as $row)
+                        @foreach ($details as $row)
                             <tr>
                                 <td class="px-6 py-3 tnum whitespace-nowrap">{{ $row->transaction_date->format('d M Y') }}</td>
                                 <td class="px-6 py-3 text-ink/70">{{ $row->description }}</td>
@@ -80,6 +84,9 @@
                         @endforeach
                     </tbody>
                 </table>
+            </div>
+            <div class="px-6 py-4">
+                {{ $details->links() }}
             </div>
         @endif
     </div>

@@ -50,23 +50,25 @@
         </p>
     </div>
 
-    {{-- KPI utama --}}
+    {{-- KPI utama: hanya angka headline, masing-masing sekali tampil di sini.
+         Rinciannya ada di card/section di bawah — tidak diulang sebagai card
+         terpisah supaya tidak dobel. --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-
-        <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
-            <p class="text-xs font-medium text-ink/50 mb-2 uppercase tracking-wide">Pendapatan Diterima</p>
-            <p class="font-display font-semibold text-2xl tnum">
-                Rp {{ number_format($profitLoss['revenue_paid'], 0, ',', '.') }}
-            </p>
-            <p class="text-xs text-ink/40 mt-1">Sudah dibayar oleh pelanggan</p>
-        </div>
 
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
             <p class="text-xs font-medium text-ink/50 mb-2 uppercase tracking-wide">Laba Bersih</p>
             <p class="font-display font-semibold text-2xl tnum {{ $profitLoss['net_profit'] < 0 ? 'text-red-700' : 'text-emerald-700' }}">
                 Rp {{ number_format($profitLoss['net_profit'], 0, ',', '.') }}
             </p>
-            <p class="text-xs text-ink/40 mt-1">Laba kotor &ndash; biaya operasional</p>
+            <p class="text-xs text-ink/40 mt-1">Rincian di Ringkasan Laba Rugi &darr;</p>
+        </div>
+
+        <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
+            <p class="text-xs font-medium text-ink/50 mb-2 uppercase tracking-wide">Kas Bersih</p>
+            <p class="font-display font-semibold text-2xl tnum {{ $cashFlow['net_cash'] < 0 ? 'text-red-700' : 'text-emerald-700' }}">
+                Rp {{ number_format($cashFlow['net_cash'], 0, ',', '.') }}
+            </p>
+            <p class="text-xs text-ink/40 mt-1">Kas masuk &ndash; kas keluar periode ini</p>
         </div>
 
         <div class="rounded-2xl bg-gradient-to-br from-ink to-[#0a0a0b] text-white shadow-panel p-6">
@@ -78,87 +80,125 @@
         </div>
 
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
-            <p class="text-xs font-medium text-ink/50 mb-2 uppercase tracking-wide">Penjualan Bulan Ini</p>
-            <p class="font-display font-semibold text-2xl tnum">
-                Rp {{ number_format($salesPurchase['total_sales'], 0, ',', '.') }}
-            </p>
-            <p class="text-xs text-ink/40 mt-1">Termasuk yang belum dibayar</p>
-        </div>
-
-    </div>
-
-    {{-- Kas & Pembelian --}}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-
-        <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
-            <div class="flex items-center gap-2 mb-2">
-                <span class="h-6 w-6 rounded-md bg-emerald-50 flex items-center justify-center">
-                    <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-                </span>
-                <p class="text-xs font-medium text-ink/50 uppercase tracking-wide">Kas Masuk</p>
-            </div>
-            <p class="font-display font-semibold text-xl tnum text-emerald-700">
-                Rp {{ number_format($cashFlow['total_in'], 0, ',', '.') }}
-            </p>
-        </div>
-
-        <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
-            <div class="flex items-center gap-2 mb-2">
-                <span class="h-6 w-6 rounded-md bg-red-50 flex items-center justify-center">
-                    <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 text-red-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
-                </span>
-                <p class="text-xs font-medium text-ink/50 uppercase tracking-wide">Kas Keluar</p>
-            </div>
-            <p class="font-display font-semibold text-xl tnum text-red-700">
-                Rp {{ number_format($cashFlow['total_out'], 0, ',', '.') }}
-            </p>
-        </div>
-
-        <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
-            <p class="text-xs font-medium text-ink/50 mb-2 uppercase tracking-wide">Total Pembelian</p>
-            <p class="font-display font-semibold text-xl tnum">
-                Rp {{ number_format($salesPurchase['total_purchase'], 0, ',', '.') }}
-            </p>
-            <p class="text-xs text-ink/40 mt-1">Nilai PO periode ini</p>
-        </div>
-
-        <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
-            <p class="text-xs font-medium text-ink/50 mb-2 uppercase tracking-wide">Total Pengeluaran</p>
-            <p class="font-display font-semibold text-xl tnum">
-                Rp {{ number_format($expenseBreakdown['total'], 0, ',', '.') }}
-            </p>
-            <div class="text-xs text-ink/40 mt-1 flex gap-2">
-                <span>Operasional: Rp {{ number_format($expenseBreakdown['operational'], 0, ',', '.') }}</span>
-            </div>
-            <div class="text-xs text-ink/40 flex gap-2">
-                <span>Pembelian: Rp {{ number_format($expenseBreakdown['purchase'], 0, ',', '.') }}</span>
+            <p class="text-xs font-medium text-ink/50 mb-2 uppercase tracking-wide">Piutang &amp; Hutang</p>
+            <div class="flex items-center justify-between mt-1">
+                <a href="{{ route('reports.receivable') }}" class="group">
+                    <span class="block text-[11px] text-ink/40">Piutang (AR)</span>
+                    <span class="font-display font-semibold text-lg tnum group-hover:text-amber-600 transition-colors">
+                        Rp {{ number_format($totalReceivable, 0, ',', '.') }}
+                    </span>
+                </a>
+                <span class="h-8 w-px bg-ink/10"></span>
+                <a href="{{ route('reports.payable') }}" class="group text-right">
+                    <span class="block text-[11px] text-ink/40">Hutang (AP)</span>
+                    <span class="font-display font-semibold text-lg tnum group-hover:text-amber-600 transition-colors">
+                        Rp {{ number_format($totalPayable, 0, ',', '.') }}
+                    </span>
+                </a>
             </div>
         </div>
 
     </div>
 
-    {{-- Hutang / Piutang --}}
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+    {{-- Ringkasan Laba Rugi + panel Kas & Pembelian --}}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
 
-        <a href="{{ route('reports.receivable') }}" class="group block rounded-2xl border border-ink/10 bg-white shadow-card p-6 hover:border-amber-400/60 hover:shadow-glow transition-all">
-            <div class="flex items-center justify-between mb-2">
-                <p class="text-xs font-medium text-ink/50 uppercase tracking-wide">Total Piutang (AR)</p>
-                <span class="text-xs text-amber-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">Lihat detail &rarr;</span>
+        {{-- Ringkasan Laba Rugi: satu-satunya tempat untuk alur pendapatan -> retur -> HPP -> laba --}}
+        <div class="lg:col-span-2 rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
+            <div class="px-6 py-4 border-b border-ink/10 flex items-center gap-2.5">
+                <span class="h-7 w-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                    <svg viewBox="0 0 24 24" class="h-4 w-4 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 6-6 4 4 8-9M13.5 5H21v7.5"/></svg>
+                </span>
+                <h2 class="font-display font-semibold">Ringkasan Laba Rugi</h2>
             </div>
-            <p class="font-display font-semibold text-xl tnum">
-                Rp {{ number_format($totalReceivable, 0, ',', '.') }}
-            </p>
-        </a>
 
-        <a href="{{ route('reports.payable') }}" class="group block rounded-2xl border border-ink/10 bg-white shadow-card p-6 hover:border-amber-400/60 hover:shadow-glow transition-all">
-            <div class="flex items-center justify-between mb-2">
-                <p class="text-xs font-medium text-ink/50 uppercase tracking-wide">Total Hutang (AP)</p>
-                <span class="text-xs text-amber-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">Lihat detail &rarr;</span>
+            {{-- Alur utama: tiap baris mengurangi baris sebelumnya, sampai Laba Bersih --}}
+            <div class="divide-y divide-ink/[0.06] text-sm">
+                <div class="flex items-center justify-between px-6 py-3.5">
+                    <span class="text-ink/60">Penjualan Kotor</span>
+                    <span class="tnum">Rp {{ number_format($profitLoss['revenue_gross'], 0, ',', '.') }}</span>
+                </div>
+                <div class="flex items-center justify-between px-6 py-3.5">
+                    <span class="text-ink/60">Retur Penjualan (SO)</span>
+                    <span class="tnum text-red-700">- Rp {{ number_format($profitLoss['sales_return'], 0, ',', '.') }}</span>
+                </div>
+                <div class="px-6 py-3.5 font-medium bg-ink/[0.02]">
+                    <div class="flex items-center justify-between">
+                        <span>Penjualan Bersih</span>
+                        <span class="tnum">Rp {{ number_format($profitLoss['revenue'], 0, ',', '.') }}</span>
+                    </div>
+                    <p class="text-xs font-normal text-ink/40 mt-1">
+                        Diterima Rp {{ number_format($profitLoss['revenue_paid'], 0, ',', '.') }}
+                        &middot; Piutang Rp {{ number_format($profitLoss['revenue_pending'], 0, ',', '.') }}
+                    </p>
+                </div>
+                <div class="flex items-center justify-between px-6 py-3.5">
+                    <span class="text-ink/60">HPP (FIFO)</span>
+                    <span class="tnum text-red-700">- Rp {{ number_format($profitLoss['hpp'], 0, ',', '.') }}</span>
+                </div>
+                <div class="flex items-center justify-between px-6 py-3.5 font-medium bg-ink/[0.02]">
+                    <span>Laba Kotor</span>
+                    <span class="tnum">Rp {{ number_format($profitLoss['gross_profit'], 0, ',', '.') }}</span>
+                </div>
+                <div class="flex items-center justify-between px-6 py-3.5">
+                    <span class="text-ink/60">Biaya Operasional</span>
+                    <span class="tnum text-red-700">- Rp {{ number_format($profitLoss['operational_expense'], 0, ',', '.') }}</span>
+                </div>
+                <div class="flex items-center justify-between px-6 py-3.5 font-semibold bg-amber-50/60">
+                    <span>Laba Bersih</span>
+                    <span class="tnum {{ $profitLoss['net_profit'] < 0 ? 'text-red-700' : 'text-emerald-700' }}">
+                        Rp {{ number_format($profitLoss['net_profit'], 0, ',', '.') }}
+                    </span>
+                </div>
             </div>
-            <p class="font-display font-semibold text-xl tnum">
-                Rp {{ number_format($totalPayable, 0, ',', '.') }}
+
+            {{-- Info tambahan, di luar alur laba rugi (belum memengaruhi laba) --}}
+            <div class="border-t border-ink/10 bg-ink/[0.015] px-6 py-3.5">
+                <p class="text-xs text-ink/40">
+                    Retur Pembelian (PO) periode ini: Rp {{ number_format($profitLoss['purchase_return'], 0, ',', '.') }}
+                    &mdash; mengurangi hutang, belum memengaruhi laba (lihat panel Pembelian di samping).
+                </p>
+            </div>
+        </div>
+
+        {{-- Panel Kas & Pembelian: rangkuman arus kas + PO, saling melengkapi Ringkasan Laba Rugi --}}
+        <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden flex flex-col">
+            <div class="px-6 py-4 border-b border-ink/10">
+                <h2 class="font-display font-semibold">Kas &amp; Pembelian</h2>
+                <p class="text-xs text-ink/40 mt-0.5">Riil (kas) &amp; PO periode ini</p>
+            </div>
+            <div class="divide-y divide-ink/[0.06] text-sm flex-1">
+                <div class="flex items-center justify-between px-6 py-3">
+                    <span class="text-ink/60 flex items-center gap-1.5">
+                        <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+                        Kas Masuk
+                    </span>
+                    <span class="tnum text-emerald-700">Rp {{ number_format($cashFlow['total_in'], 0, ',', '.') }}</span>
+                </div>
+                <div class="flex items-center justify-between px-6 py-3">
+                    <span class="text-ink/60 flex items-center gap-1.5">
+                        <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 text-red-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                        Kas Keluar
+                    </span>
+                    <span class="tnum text-red-700">Rp {{ number_format($cashFlow['total_out'], 0, ',', '.') }}</span>
+                </div>
+                <div class="flex items-center justify-between px-6 py-3">
+                    <span class="text-ink/60">Biaya Operasional</span>
+                    <span class="tnum">Rp {{ number_format($expenseBreakdown['operational'], 0, ',', '.') }}</span>
+                </div>
+                <div class="flex items-center justify-between px-6 py-3">
+                    <span class="text-ink/60">Total Pembelian (PO)</span>
+                    <span class="tnum">Rp {{ number_format($profitLoss['purchase'], 0, ',', '.') }}</span>
+                </div>
+                <div class="flex items-center justify-between px-6 py-3">
+                    <span class="text-ink/60">Retur Pembelian (PO)</span>
+                    <span class="tnum">Rp {{ number_format($profitLoss['purchase_return'], 0, ',', '.') }}</span>
+                </div>
+            </div>
+            <p class="text-[11px] text-ink/35 px-6 py-2.5 border-t border-ink/10">
+                Pembelian belum jadi HPP &mdash; baru diakui saat barangnya terjual.
             </p>
-        </a>
+        </div>
 
     </div>
 
@@ -177,8 +217,8 @@
 
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
             <div class="px-6 py-4 border-b border-ink/10">
-                <h2 class="font-display font-semibold">Komposisi Pengeluaran</h2>
-                <p class="text-xs text-ink/40 mt-0.5">Operasional vs. pembelian</p>
+                <h2 class="font-display font-semibold">Komposisi Biaya</h2>
+                <p class="text-xs text-ink/40 mt-0.5">Operasional vs. kas ke supplier</p>
             </div>
             <div class="p-4 flex items-center justify-center">
                 <canvas id="expenseChart" height="220"></canvas>
@@ -187,59 +227,7 @@
 
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-
-        <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
-            <div class="px-6 py-4 border-b border-ink/10">
-                <h2 class="font-display font-semibold">Produk Terlaris</h2>
-                <p class="text-xs text-ink/40 mt-0.5">Berdasarkan jumlah qty terjual</p>
-            </div>
-            <div class="p-4">
-                <canvas id="topProductsChart" height="220"></canvas>
-            </div>
-        </div>
-
-        {{-- Ringkasan Laba Rugi --}}
-        <div class="lg:col-span-2 rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
-            <div class="px-6 py-4 border-b border-ink/10 flex items-center gap-2.5">
-                <span class="h-7 w-7 rounded-lg bg-amber-50 flex items-center justify-center">
-                    <svg viewBox="0 0 24 24" class="h-4 w-4 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 6-6 4 4 8-9M13.5 5H21v7.5"/></svg>
-                </span>
-                <h2 class="font-display font-semibold">Ringkasan Laba Rugi</h2>
-            </div>
-            <div class="divide-y divide-ink/[0.06] text-sm">
-                <div class="flex items-center justify-between px-6 py-3.5">
-                    <span class="text-ink/60">Pendapatan Penjualan (diterima)</span>
-                    <span class="tnum">Rp {{ number_format($profitLoss['revenue_paid'], 0, ',', '.') }}</span>
-                </div>
-                <div class="flex items-center justify-between px-6 py-3.5">
-                    <span class="text-ink/60 flex items-center gap-1.5">
-                        Pendapatan Tertahan
-                        <span class="text-[10px] font-medium text-amber-700 bg-amber-50 rounded-full px-1.5 py-0.5">belum dibayar</span>
-                    </span>
-                    <span class="tnum">Rp {{ number_format($profitLoss['revenue_pending'], 0, ',', '.') }}</span>
-                </div>
-                <div class="flex items-center justify-between px-6 py-3.5">
-                    <span class="text-ink/60">HPP (FIFO)</span>
-                    <span class="tnum">Rp {{ number_format($profitLoss['hpp'], 0, ',', '.') }}</span>
-                </div>
-                <div class="flex items-center justify-between px-6 py-3.5 font-medium">
-                    <span>Laba Kotor</span>
-                    <span class="tnum">Rp {{ number_format($profitLoss['gross_profit'], 0, ',', '.') }}</span>
-                </div>
-                <div class="flex items-center justify-between px-6 py-3.5">
-                    <span class="text-ink/60">Biaya Operasional</span>
-                    <span class="tnum">Rp {{ number_format($profitLoss['operational_expense'], 0, ',', '.') }}</span>
-                </div>
-                <div class="flex items-center justify-between px-6 py-3.5 font-semibold bg-amber-50/60">
-                    <span>Laba Bersih</span>
-                    <span class="tnum">Rp {{ number_format($profitLoss['net_profit'], 0, ',', '.') }}</span>
-                </div>
-            </div>
-        </div>
-
-    </div>
-
+    {{-- Produk & Stok --}}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {{-- Stok menipis --}}
@@ -270,13 +258,13 @@
             @endif
         </div>
 
-        {{-- Produk terlaris (tabel) --}}
+        {{-- Produk terlaris (tabel — sudah mencakup qty & revenue, jadi tidak perlu grafik batang terpisah) --}}
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
             <div class="px-6 py-4 border-b border-ink/10 flex items-center gap-2.5">
                 <span class="h-7 w-7 rounded-lg bg-emerald-50 flex items-center justify-center">
                     <svg viewBox="0 0 24 24" class="h-4 w-4 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg>
                 </span>
-                <h2 class="font-display font-semibold">Trend Produk Terlaris</h2>
+                <h2 class="font-display font-semibold">Produk Terlaris</h2>
             </div>
             @if ($topProducts->isEmpty())
                 <p class="px-6 py-8 text-sm text-ink/40 text-center">Belum ada penjualan pada periode ini.</p>
@@ -362,7 +350,7 @@
         new Chart(document.getElementById('expenseChart'), {
             type: 'doughnut',
             data: {
-                labels: ['Biaya Operasional', 'Biaya Pembelian'],
+                labels: ['Biaya Operasional', 'Kas ke Supplier (pembelian)'],
                 datasets: [{
                     data: [{{ $expenseBreakdown['operational'] }}, {{ $expenseBreakdown['purchase'] }}],
                     backgroundColor: ['#f59e0b', '#111214'],
@@ -372,26 +360,6 @@
             options: {
                 responsive: true,
                 plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
-            },
-        });
-
-        const topProducts = @json($topProducts);
-        new Chart(document.getElementById('topProductsChart'), {
-            type: 'bar',
-            data: {
-                labels: topProducts.map(p => p.product_name),
-                datasets: [{
-                    label: 'Qty Terjual',
-                    data: topProducts.map(p => p.total_qty),
-                    backgroundColor: '#f59e0b',
-                    borderRadius: 6,
-                }],
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: { x: { ticks: { precision: 0 } } },
             },
         });
     });

@@ -12,7 +12,7 @@ class ExpenseCategoryController extends Controller
     {
         $expenseCategories = ExpenseCategory::withCount('expenses')
             ->orderBy('name')
-            ->paginate(20);
+            ->paginate(10);
 
         return view('expense-categories.index', compact('expenseCategories'));
     }

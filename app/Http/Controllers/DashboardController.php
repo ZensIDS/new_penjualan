@@ -34,7 +34,6 @@ class DashboardController extends Controller
         $profitLoss = $this->reportService->profitLossReport($startDateStr, $endDateStr);
         $cashFlow   = $this->reportService->cashFlowReport($startDateStr, $endDateStr);
 
-        $salesPurchase    = $this->reportService->salesPurchaseSummary($startDateStr, $endDateStr);
         $expenseBreakdown = $this->reportService->expenseBreakdown($startDateStr, $endDateStr);
         $topProducts      = $this->reportService->topSellingProducts($startDateStr, $endDateStr, 5);
         $dailySalesTrend  = $this->reportService->dailySalesTrend($startDateStr, $endDateStr);
@@ -59,7 +58,6 @@ class DashboardController extends Controller
             'endDate'          => $endDateStr,
             'profitLoss'       => $profitLoss,
             'cashFlow'         => $cashFlow,
-            'salesPurchase'    => $salesPurchase,
             'expenseBreakdown' => $expenseBreakdown,
             'topProducts'      => $topProducts,
             'dailySalesTrend'  => $dailySalesTrend,

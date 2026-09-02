@@ -16,7 +16,7 @@ class ExpenseController extends Controller
     {
         $expenses = Expense::with('category')
             ->latest('expense_date')
-            ->paginate(20);
+            ->paginate(10);
 
         $expenseCategories = ExpenseCategory::orderBy('name')->get(['id', 'name']);
 

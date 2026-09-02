@@ -137,12 +137,17 @@ class ReportExportController extends Controller
         $row = ExcelStyler::title($sheet, 'Laporan Laba Rugi', $period, $colSpan);
 
         $row = ExcelStyler::summaryBlock($sheet, $row, [
-            ['label' => 'Pendapatan Penjualan (diterima)', 'value' => $data['revenue_paid'], 'format' => ExcelStyler::FMT_RP],
-            ['label' => 'Pendapatan Tertahan (belum dibayar)', 'value' => $data['revenue_pending'], 'format' => ExcelStyler::FMT_RP],
-            ['label' => 'HPP (FIFO)', 'value' => $data['hpp'], 'format' => ExcelStyler::FMT_RP],
+            ['label' => 'Penjualan Kotor', 'value' => $data['revenue_gross'], 'format' => ExcelStyler::FMT_RP],
+            ['label' => 'Retur Penjualan (SO)', 'value' => -$data['sales_return'], 'format' => ExcelStyler::FMT_RP],
+            ['label' => 'Penjualan Bersih', 'value' => $data['revenue'], 'format' => ExcelStyler::FMT_RP],
+            ['label' => '  - sudah diterima', 'value' => $data['revenue_paid'], 'format' => ExcelStyler::FMT_RP],
+            ['label' => '  - masih piutang', 'value' => $data['revenue_pending'], 'format' => ExcelStyler::FMT_RP],
+            ['label' => 'HPP (FIFO)', 'value' => -$data['hpp'], 'format' => ExcelStyler::FMT_RP],
             ['label' => 'Laba Kotor', 'value' => $data['gross_profit'], 'format' => ExcelStyler::FMT_RP],
-            ['label' => 'Biaya Operasional', 'value' => $data['operational_expense'], 'format' => ExcelStyler::FMT_RP],
+            ['label' => 'Biaya Operasional', 'value' => -$data['operational_expense'], 'format' => ExcelStyler::FMT_RP],
             ['label' => 'Laba Bersih', 'value' => $data['net_profit'], 'format' => ExcelStyler::FMT_RP, 'highlight' => true],
+            ['label' => 'Total Pembelian (PO) - info, belum jadi HPP (masih stok)', 'value' => $data['purchase'], 'format' => ExcelStyler::FMT_RP],
+            ['label' => 'Retur Pembelian (PO) - info, tidak memengaruhi laba', 'value' => $data['purchase_return'], 'format' => ExcelStyler::FMT_RP],
         ], $colSpan);
 
         $row = ExcelStyler::sectionTitle($sheet, $row, 'Biaya Operasional per Kategori', $colSpan);
@@ -185,7 +190,9 @@ class ReportExportController extends Controller
 
         $row = ExcelStyler::header($sheet, $row, ['Tanggal', 'Keterangan', 'Arah', 'Jumlah']);
 
-        $details = $data['details']->sortByDesc('transaction_date')->map(fn($r) => [
+        // $data['details'] sudah terurut DESC (transaction_date lalu id) dari
+        // ReportService::cashFlowReport() — tidak perlu di-sort ulang di sini.
+        $details = $data['details']->map(fn($r) => [
             $r->transaction_date->format('d-m-Y'),
             $r->description,
             $r->direction === 'in' ? 'Masuk' : 'Keluar',

@@ -17,35 +17,58 @@
                 </span>
                 <h2 class="font-display font-semibold">Ringkasan Laba Rugi</h2>
             </div>
+            {{-- Alur utama: tiap baris mengurangi baris sebelumnya, sampai Laba Bersih --}}
             <div class="divide-y divide-ink/[0.06] text-sm">
                 <div class="flex items-center justify-between px-6 py-3.5">
-                    <span class="text-ink/60">Pendapatan Penjualan (diterima)</span>
-                    <span class="tnum">Rp {{ number_format($data['revenue_paid'], 0, ',', '.') }}</span>
+                    <span class="text-ink/60">Penjualan Kotor</span>
+                    <span class="tnum">Rp {{ number_format($data['revenue_gross'], 0, ',', '.') }}</span>
                 </div>
                 <div class="flex items-center justify-between px-6 py-3.5">
-                    <span class="text-ink/60 flex items-center gap-1.5">
-                        Pendapatan Tertahan
-                        <span class="text-[10px] font-medium text-amber-700 bg-amber-50 rounded-full px-1.5 py-0.5">belum dibayar</span>
-                    </span>
-                    <span class="tnum">Rp {{ number_format($data['revenue_pending'], 0, ',', '.') }}</span>
+                    <span class="text-ink/60">Retur Penjualan (SO)</span>
+                    <span class="tnum text-red-700">- Rp {{ number_format($data['sales_return'], 0, ',', '.') }}</span>
+                </div>
+                <div class="px-6 py-3.5 font-medium bg-ink/[0.02]">
+                    <div class="flex items-center justify-between">
+                        <span>Penjualan Bersih</span>
+                        <span class="tnum">Rp {{ number_format($data['revenue'], 0, ',', '.') }}</span>
+                    </div>
+                    <p class="text-xs font-normal text-ink/40 mt-1">
+                        Diterima Rp {{ number_format($data['revenue_paid'], 0, ',', '.') }}
+                        &middot; Piutang Rp {{ number_format($data['revenue_pending'], 0, ',', '.') }}
+                    </p>
                 </div>
                 <div class="flex items-center justify-between px-6 py-3.5">
                     <span class="text-ink/60">HPP (FIFO)</span>
-                    <span class="tnum">Rp {{ number_format($data['hpp'], 0, ',', '.') }}</span>
+                    <span class="tnum text-red-700">- Rp {{ number_format($data['hpp'], 0, ',', '.') }}</span>
                 </div>
-                <div class="flex items-center justify-between px-6 py-3.5 font-medium">
+                <div class="flex items-center justify-between px-6 py-3.5 font-medium bg-ink/[0.02]">
                     <span>Laba Kotor</span>
                     <span class="tnum">Rp {{ number_format($data['gross_profit'], 0, ',', '.') }}</span>
                 </div>
                 <div class="flex items-center justify-between px-6 py-3.5">
                     <span class="text-ink/60">Biaya Operasional</span>
-                    <span class="tnum">Rp {{ number_format($data['operational_expense'], 0, ',', '.') }}</span>
+                    <span class="tnum text-red-700">- Rp {{ number_format($data['operational_expense'], 0, ',', '.') }}</span>
                 </div>
                 <div class="flex items-center justify-between px-6 py-3.5 font-semibold bg-amber-50/60">
                     <span>Laba Bersih</span>
                     <span class="tnum {{ $data['net_profit'] < 0 ? 'text-red-700' : 'text-emerald-700' }}">
                         Rp {{ number_format($data['net_profit'], 0, ',', '.') }}
                     </span>
+                </div>
+            </div>
+
+            {{-- Info tambahan, di luar alur laba rugi (belum memengaruhi laba) --}}
+            <div class="border-t border-ink/10 bg-ink/[0.015] px-6 py-3.5">
+                <p class="text-xs text-ink/40 mb-2.5">
+                    Pembelian (PO) &mdash; belum memengaruhi laba, karena masih berupa stok. Baru jadi HPP saat barangnya terjual.
+                </p>
+                <div class="flex items-center justify-between text-xs text-ink/50">
+                    <span>Total Pembelian periode ini</span>
+                    <span class="tnum">Rp {{ number_format($data['purchase'], 0, ',', '.') }}</span>
+                </div>
+                <div class="flex items-center justify-between text-xs text-ink/50 mt-1">
+                    <span>Retur Pembelian (PO)</span>
+                    <span class="tnum">Rp {{ number_format($data['purchase_return'], 0, ',', '.') }}</span>
                 </div>
             </div>
         </div>
@@ -71,6 +94,32 @@
                     @endforeach
                 </div>
             @endif
+        </div>
+
+        {{-- Retur SO & PO periode ini --}}
+        <div class="lg:col-span-3 rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
+            <div class="px-6 py-4 border-b border-ink/10">
+                <h2 class="font-display font-semibold">Pembelian &amp; Retur SO / PO</h2>
+                <p class="text-xs text-ink/40 mt-0.5">Nilai pada periode yang dipilih (berdasar tanggal transaksi / tanggal retur)</p>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-ink/[0.06] text-sm">
+                <div class="px-6 py-4">
+                    <p class="text-ink/60 mb-1">Total Pembelian (PO)</p>
+                    <p class="tnum text-lg font-semibold">Rp {{ number_format($data['purchase'], 0, ',', '.') }}</p>
+                </div>
+                <div class="px-6 py-4">
+                    <p class="text-ink/60 mb-1">Retur Pembelian (PO)</p>
+                    <p class="tnum text-lg font-semibold text-amber-700">Rp {{ number_format($data['purchase_return'], 0, ',', '.') }}</p>
+                </div>
+                <div class="px-6 py-4">
+                    <p class="text-ink/60 mb-1">Retur Penjualan (SO)</p>
+                    <p class="tnum text-lg font-semibold text-red-700">Rp {{ number_format($data['sales_return'], 0, ',', '.') }}</p>
+                </div>
+                <div class="px-6 py-4">
+                    <p class="text-ink/60 mb-1">HPP Retur Penjualan</p>
+                    <p class="tnum text-lg font-semibold">Rp {{ number_format($data['sales_return_hpp'], 0, ',', '.') }}</p>
+                </div>
+            </div>
         </div>
 
     </div>

@@ -10,11 +10,20 @@ class ReportController extends Controller
 {
     public function __construct(protected ReportService $reportService) {}
 
-    public function stock()
+    /**
+     * Pagination & pencarian dilakukan di server supaya halaman ini tetap
+     * ringan walau jumlah produk sudah ribuan baris (dulu: semua produk +
+     * semua batch di-dump sekaligus ke halaman lalu difilter di JS).
+     */
+    public function stock(Request $request)
     {
-        $data = $this->reportService->stockReport();
+        $search = $request->input('search');
 
-        return view('reports.stock', compact('data'));
+        $data = $this->reportService->stockReportPaginated($search, 25);
+        $kpis = $this->reportService->stockKpis();
+        $byCategory = $this->reportService->stockValueByCategory();
+
+        return view('reports.stock', compact('data', 'kpis', 'byCategory', 'search'));
     }
 
     public function profitLoss(Request $request)
@@ -36,25 +45,42 @@ class ReportController extends Controller
 
         $data = $this->reportService->cashFlowReport($start, $end);
 
+        // Tabel "Rincian Transaksi" dipaginasi terpisah (25/halaman) supaya
+        // tidak nge-render seluruh transaksi kas dalam rentang tanggal
+        // sekaligus. KPI & grafik di atas tetap pakai $data (agregat semua
+        // baris pada rentang tanggal terpilih).
+        $details = $this->reportService->cashFlowDetailsPaginated($start, $end, 25);
+
         return view('reports.cash-flow', [
             'data'      => $data,
+            'details'   => $details,
             'startDate' => $start,
             'endDate'   => $end,
         ]);
     }
 
-    public function payable()
+    /**
+     * Sama seperti stock(): pagination & pencarian di server, bukan dump
+     * semua PO belum lunas sekaligus ke halaman.
+     */
+    public function payable(Request $request)
     {
-        $data = $this->reportService->accountPayableReport();
+        $search = $request->input('search');
 
-        return view('reports.payable', compact('data'));
+        $data = $this->reportService->accountPayableReportPaginated($search, 25);
+        $kpis = $this->reportService->payableKpis();
+
+        return view('reports.payable', compact('data', 'kpis', 'search'));
     }
 
-    public function receivable()
+    public function receivable(Request $request)
     {
-        $data = $this->reportService->accountReceivableReport();
+        $search = $request->input('search');
 
-        return view('reports.receivable', compact('data'));
+        $data = $this->reportService->accountReceivableReportPaginated($search, 25);
+        $kpis = $this->reportService->receivableKpis();
+
+        return view('reports.receivable', compact('data', 'kpis', 'search'));
     }
 
     /**
