@@ -8,6 +8,7 @@ use App\Http\Controllers\ExpenseCategoryController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\PurchaseReturnController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\SalesOrderController;
@@ -102,6 +103,10 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
         ->name('purchase-orders.payments.store');
     Route::put('purchase-orders/{purchaseOrder}/payments/{payment}', [PurchaseOrderController::class, 'updatePayment'])
         ->name('purchase-orders.payments.update');
+    Route::post('purchase-orders/{purchaseOrder}/returns', [PurchaseReturnController::class, 'store'])
+        ->name('purchase-orders.returns.store');
+    Route::delete('purchase-orders/{purchaseOrder}/returns/{return}', [PurchaseReturnController::class, 'destroy'])
+        ->name('purchase-orders.returns.destroy');
 
     Route::post('sales-orders', [SalesOrderController::class, 'store'])
         ->name('sales-orders.store');

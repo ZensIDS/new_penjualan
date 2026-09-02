@@ -40,7 +40,7 @@ class PurchaseOrderController extends Controller
 
     public function show(PurchaseOrder $purchaseOrder)
     {
-        $purchaseOrder->load(['supplier', 'items.product', 'items.stockBatch', 'payments']);
+        $purchaseOrder->load(['supplier', 'items.product', 'items.stockBatch', 'items.returnItems', 'payments', 'returns.items.product']);
 
         return view('purchase-orders.show', compact('purchaseOrder'));
     }

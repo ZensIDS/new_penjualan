@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Product;
 use App\Models\PurchaseOrderItem;
+use App\Models\PurchaseReturnItem;
 use App\Models\SaleItem;
 use App\Models\StockBatch;
 use App\Models\StockMovement;
@@ -145,6 +146,85 @@ class StockService
         foreach (array_keys($affectedProductIds) as $productId) {
             $this->syncProductQtyOnHand($productId);
         }
+    }
+
+    /**
+     * Keluarkan qty dari batch stok hasil 1 baris PO item karena barang
+     * dikembalikan (retur) ke supplier. Batch harus milik item yang sama,
+     * dan hanya boleh sebesar qty_remaining yang masih ada di batch itu —
+     * kalau barangnya sudah kadung terjual, sisa yang bisa diretur otomatis
+     * lebih kecil (dicek oleh pemanggil / PurchaseReturnService).
+     *
+     * @throws RuntimeException kalau qty retur melebihi sisa batch yang ada
+     */
+    public function returnToSupplier(PurchaseOrderItem $item, int $qty, string $returnDate, PurchaseReturnItem $returnItem): void
+    {
+        if ($qty <= 0) {
+            throw new RuntimeException('Qty retur harus lebih dari 0.');
+        }
+
+        // Lock baris batch supaya aman dari race condition kalau ada transaksi
+        // penjualan/retur lain terjadi bersamaan (wajib dipanggil di dalam DB::transaction()).
+        $batch = StockBatch::where('purchase_order_item_id', $item->id)->lockForUpdate()->first();
+
+        if (! $batch || $qty > $batch->qty_remaining) {
+            $available = $batch->qty_remaining ?? 0;
+            throw new RuntimeException(
+                "Qty retur untuk \"{$item->product->name}\" ({$qty}) melebihi sisa stok yang masih ada dari PO ini ({$available}). Barang yang sudah terjual tidak bisa diretur ke supplier."
+            );
+        }
+
+        $batch->qty_remaining -= $qty;
+        $batch->save();
+
+        StockMovement::create([
+            'product_id'      => $item->product_id,
+            'stock_batch_id'  => $batch->id,
+            'type'            => 'out',
+            'qty'             => $qty,
+            'movement_date'   => $returnDate,
+            'reference_type'  => 'purchase_return_item',
+            'reference_id'    => $returnItem->id,
+            'note'            => "Retur ke supplier — PO #{$item->purchaseOrder->po_number}",
+        ]);
+
+        $this->syncProductQtyOnHand($item->product_id);
+    }
+
+    /**
+     * Kebalikan dari returnToSupplier() — kembalikan qty ke batch asal saat
+     * sebuah retur PO dihapus/dibatalkan. Selalu aman (menambah qty_remaining,
+     * tidak pernah bikin negatif), jadi tidak perlu validasi batas atas.
+     */
+    public function undoReturnToSupplier(PurchaseReturnItem $returnItem, string $movementDate): void
+    {
+        $poItem = $returnItem->purchaseOrderItem;
+
+        // Lock baris batch supaya aman dari race condition (wajib dipanggil
+        // di dalam DB::transaction()).
+        $batch = StockBatch::where('purchase_order_item_id', $poItem->id)->lockForUpdate()->first();
+
+        if (! $batch) {
+            throw new RuntimeException(
+                "Batch stok untuk produk \"{$returnItem->product->name}\" tidak ditemukan, retur tidak bisa dibatalkan."
+            );
+        }
+
+        $batch->qty_remaining += $returnItem->qty;
+        $batch->save();
+
+        StockMovement::create([
+            'product_id'      => $returnItem->product_id,
+            'stock_batch_id'  => $batch->id,
+            'type'            => 'in',
+            'qty'             => $returnItem->qty,
+            'movement_date'   => $movementDate,
+            'reference_type'  => 'purchase_return_item',
+            'reference_id'    => $returnItem->id,
+            'note'            => "Pembatalan retur {$returnItem->purchaseReturn->return_number} — PO #{$poItem->purchaseOrder->po_number}",
+        ]);
+
+        $this->syncProductQtyOnHand($returnItem->product_id);
     }
 
     /**

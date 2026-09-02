@@ -28,4 +28,17 @@ class PurchaseOrderItem extends Model
     {
         return $this->hasOne(StockBatch::class);
     }
+
+    public function returnItems()
+    {
+        return $this->hasMany(PurchaseReturnItem::class);
+    }
+
+    /**
+     * Total qty yang sudah pernah diretur ke supplier dari baris PO ini.
+     */
+    public function getQtyReturnedAttribute(): int
+    {
+        return (int) $this->returnItems()->sum('qty');
+    }
 }

@@ -35,6 +35,11 @@ class PurchaseOrder extends Model
         return $this->hasMany(PurchasePayment::class);
     }
 
+    public function returns()
+    {
+        return $this->hasMany(PurchaseReturn::class);
+    }
+
     public function getRemainingBalanceAttribute(): float
     {
         return (float) $this->total_amount - (float) $this->paid_amount;
