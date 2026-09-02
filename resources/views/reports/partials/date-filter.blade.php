@@ -1,6 +1,7 @@
 {{--
     Partial filter tanggal, dipakai di reports.profit-loss & reports.cash-flow.
     Butuh variabel: $routeName (nama route saat ini), $startDate, $endDate.
+    Opsional: $exportRouteName (nama route export Excel) untuk menampilkan tombol Export Excel.
 --}}
 <div class="mb-6 rounded-2xl border border-ink/10 bg-white shadow-card p-4 sm:p-5">
     <form method="GET" action="{{ route($routeName) }}" class="flex flex-wrap items-end gap-3">
@@ -18,6 +19,14 @@
                 class="rounded-lg bg-ink text-white text-sm font-medium px-4 py-2 hover:bg-ink/90 transition-colors">
             Terapkan
         </button>
+
+        @isset($exportRouteName)
+            <a href="{{ route($exportRouteName, ['start_date' => $startDate, 'end_date' => $endDate]) }}"
+               class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600/20 bg-emerald-50 text-emerald-700 text-sm font-medium px-4 py-2 hover:bg-emerald-100 transition-colors">
+                <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                Export Excel
+            </a>
+        @endisset
 
         <div class="flex items-center gap-1.5 ml-auto flex-wrap">
             @php

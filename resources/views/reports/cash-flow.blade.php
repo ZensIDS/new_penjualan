@@ -5,7 +5,7 @@
 
 @section('content')
 
-    @include('reports.partials.date-filter', ['routeName' => 'reports.cash-flow'])
+    @include('reports.partials.date-filter', ['routeName' => 'reports.cash-flow', 'exportRouteName' => 'reports.export.cash-flow'])
 
     {{-- KPI --}}
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">

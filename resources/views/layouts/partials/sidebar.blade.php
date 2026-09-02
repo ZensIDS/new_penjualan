@@ -17,7 +17,8 @@
             ['label' => 'Customer', 'route' => 'customers.index', 'pattern' => 'customers.*'],
         ],
         'Operasional' => [
-            ['label' => 'Biaya Operasional', 'route' => 'expenses.index', 'pattern' => 'expenses.*'],
+            ['label' => 'Kategori Pengeluaran', 'route' => 'expense-categories.index', 'pattern' => 'expense-categories.*'],
+            ['label' => 'Pengeluaran', 'route' => 'expenses.index', 'pattern' => 'expenses.*'],
         ],
         'Laporan' => [
             ['label' => 'Stok', 'route' => 'reports.stock', 'pattern' => 'reports.stock'],

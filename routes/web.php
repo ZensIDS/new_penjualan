@@ -9,6 +9,7 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\SalesOrderController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\SupplierController;
@@ -73,6 +74,14 @@ Route::middleware('auth')->group(function () {
         Route::get('cash-flow', [ReportController::class, 'cashFlow'])->name('cash-flow');
         Route::get('payable', [ReportController::class, 'payable'])->name('payable');
         Route::get('receivable', [ReportController::class, 'receivable'])->name('receivable');
+
+        Route::prefix('export')->name('export.')->group(function () {
+            Route::get('stock', [ReportExportController::class, 'stock'])->name('stock');
+            Route::get('profit-loss', [ReportExportController::class, 'profitLoss'])->name('profit-loss');
+            Route::get('cash-flow', [ReportExportController::class, 'cashFlow'])->name('cash-flow');
+            Route::get('payable', [ReportExportController::class, 'payable'])->name('payable');
+            Route::get('receivable', [ReportExportController::class, 'receivable'])->name('receivable');
+        });
     });
 });
 
