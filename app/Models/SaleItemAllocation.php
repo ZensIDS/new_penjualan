@@ -29,4 +29,9 @@ class SaleItemAllocation extends Model
     {
         return $this->belongsTo(StockBatch::class);
     }
+
+    public function returnAllocations()
+    {
+        return $this->hasMany(SaleReturnItemAllocation::class);
+    }
 }

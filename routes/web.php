@@ -12,6 +12,7 @@ use App\Http\Controllers\PurchaseReturnController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\SalesOrderController;
+use App\Http\Controllers\SalesReturnController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
@@ -118,6 +119,10 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
         ->name('sales-orders.payments.store');
     Route::put('sales-orders/{salesOrder}/payments/{payment}', [SalesOrderController::class, 'updatePayment'])
         ->name('sales-orders.payments.update');
+    Route::post('sales-orders/{salesOrder}/returns', [SalesReturnController::class, 'store'])
+        ->name('sales-orders.returns.store');
+    Route::delete('sales-orders/{salesOrder}/returns/{return}', [SalesReturnController::class, 'destroy'])
+        ->name('sales-orders.returns.destroy');
 
     Route::resource('products', ProductController::class)
         ->only(['store', 'update', 'destroy']);

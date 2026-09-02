@@ -48,6 +48,11 @@ class SalesOrder extends Model
         return $this->hasMany(SalesPayment::class);
     }
 
+    public function returns()
+    {
+        return $this->hasMany(SalesReturn::class);
+    }
+
     public function getRemainingBalanceAttribute(): float
     {
         return (float) $this->total_amount - (float) $this->paid_amount;

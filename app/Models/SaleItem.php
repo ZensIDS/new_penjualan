@@ -37,6 +37,19 @@ class SaleItem extends Model
         return $this->hasMany(SaleItemAllocation::class);
     }
 
+    public function returnItems()
+    {
+        return $this->hasMany(SaleReturnItem::class);
+    }
+
+    /**
+     * Total qty yang sudah pernah diretur oleh customer dari baris SO ini.
+     */
+    public function getQtyReturnedAttribute(): int
+    {
+        return (int) $this->returnItems()->sum('qty');
+    }
+
     public function getMarginAttribute(): float
     {
         return (float) $this->subtotal - (float) $this->hpp_subtotal;

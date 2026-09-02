@@ -93,6 +93,9 @@
                                     <td class="px-6 py-3.5 text-right tnum text-ink/50">Rp {{ number_format($item->hpp_subtotal, 0, ',', '.') }}</td>
                                     <td class="px-6 py-3.5 text-right tnum {{ $item->margin >= 0 ? 'text-emerald-700' : 'text-red-700' }}">
                                         Rp {{ number_format($item->margin, 0, ',', '.') }}
+                                        @if ($item->qty_returned > 0)
+                                            <span class="block text-xs text-red-600 font-normal">Diretur: {{ $item->qty_returned }}</span>
+                                        @endif
                                     </td>
                                 </tr>
                                 @if ($item->allocations->isNotEmpty())
@@ -137,6 +140,103 @@
                 @if ($salesOrder->note)
                     <div class="px-6 py-4 border-t border-ink/10 text-sm text-ink/60">
                         <span class="font-medium text-ink/70">Catatan:</span> {{ $salesOrder->note }}
+                    </div>
+                @endif
+            </div>
+
+            {{-- Retur Penjualan --}}
+            <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
+                <div class="px-6 py-4 border-b border-ink/10">
+                    <h3 class="font-display font-semibold">Retur Penjualan</h3>
+                </div>
+                @if ($salesOrder->returns->isEmpty())
+                    <p class="px-6 py-8 text-sm text-ink/40 text-center">Belum ada retur tercatat.</p>
+                @else
+                    <div class="divide-y divide-ink/[0.06] text-sm">
+                        @foreach ($salesOrder->returns->sortByDesc('return_date') as $return)
+                            <div class="px-6 py-3.5">
+                                <div class="flex items-center justify-between gap-3">
+                                    <p class="font-medium">{{ $return->return_number }}</p>
+                                    <div class="flex items-center gap-3 shrink-0">
+                                        <p class="tnum font-medium text-red-700">- Rp {{ number_format($return->total_amount, 0, ',', '.') }}</p>
+                                        @if (auth()->user()->isSuperadmin())
+                                            <form method="POST" action="{{ route('sales-orders.returns.destroy', [$salesOrder, $return]) }}"
+                                                  onsubmit="return confirm('Hapus retur {{ $return->return_number }}? Stok akan dikeluarkan lagi, total transaksi akan ditambah kembali, dan entri kas keluar (refund) terkait (kalau ada) akan dihapus. Aksi ini tidak bisa dibatalkan.');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="text-ink/40 hover:text-red-600 p-1" title="Hapus retur">
+                                                    <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                </div>
+                                <p class="text-xs text-ink/40 mt-0.5">
+                                    {{ $return->return_date->translatedFormat('d M Y') }}
+                                    @if ($return->note) &middot; {{ $return->note }} @endif
+                                </p>
+                                <ul class="mt-2 space-y-0.5 text-xs text-ink/60">
+                                    @foreach ($return->items as $returnItem)
+                                        <li>{{ $returnItem->product->name }} &times; {{ $returnItem->qty }} {{ $returnItem->product->unit }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
+                @php
+                    $returnableItems = $salesOrder->items->filter(fn ($item) => ($item->qty - $item->qty_returned) > 0);
+                @endphp
+
+                @if (auth()->user()->isSuperadmin() && $returnableItems->isNotEmpty())
+                    <div x-data="soReturnForm()" x-cloak class="px-6 py-4 border-t border-ink/10">
+                        <button type="button" @click="open = !open"
+                                class="text-sm font-semibold text-amber-700 hover:text-amber-800 inline-flex items-center gap-1.5">
+                            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                            Buat Retur Baru
+                        </button>
+
+                        <form x-show="open" x-cloak method="POST" action="{{ route('sales-orders.returns.store', $salesOrder) }}" class="mt-4 space-y-4">
+                            @csrf
+                            <div>
+                                <label class="block text-sm font-medium mb-1.5">Tanggal Retur</label>
+                                <input type="date" name="return_date" value="{{ now()->toDateString() }}"
+                                       class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                            </div>
+
+                            <div class="space-y-3">
+                                @foreach ($returnableItems as $item)
+                                    @php $maxQty = $item->qty - $item->qty_returned; @endphp
+                                    <label class="flex items-center gap-3 rounded-xl border border-ink/10 px-3.5 py-2.5">
+                                        <input type="checkbox" :value="{{ $item->id }}" @change="toggle({{ $item->id }}, {{ $maxQty }}, $event.target.checked)"
+                                               class="h-4 w-4 rounded border-ink/25 text-amber-500 focus:ring-amber-500/40">
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-medium truncate">{{ $item->product->name }}</p>
+                                            <p class="text-xs text-ink/40">Bisa diretur: {{ $maxQty }} {{ $item->product->unit }}</p>
+                                        </div>
+                                        <input type="number" min="1" max="{{ $maxQty }}"
+                                               x-show="selected[{{ $item->id }}] !== undefined" x-cloak
+                                               x-model.number="selected[{{ $item->id }}]"
+                                               @input="clamp({{ $item->id }}, {{ $maxQty }})"
+                                               :name="selected[{{ $item->id }}] !== undefined ? 'items[{{ $item->id }}][qty]' : null"
+                                               class="w-20 rounded-lg border border-ink/12 px-2 py-1.5 text-sm text-right tnum focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                                        <input type="hidden" :name="selected[{{ $item->id }}] !== undefined ? 'items[{{ $item->id }}][sale_item_id]' : null" value="{{ $item->id }}">
+                                    </label>
+                                @endforeach
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium mb-1.5">Catatan</label>
+                                <input type="text" name="note" placeholder="Opsional, mis. alasan retur"
+                                       class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                            </div>
+
+                            <button type="submit" :disabled="Object.keys(selected).length === 0"
+                                    class="w-full text-sm font-semibold px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-ink shadow-glow hover:brightness-105 active:scale-[0.98] transition-all disabled:opacity-40 disabled:pointer-events-none">
+                                Simpan Retur
+                            </button>
+                        </form>
                     </div>
                 @endif
             </div>
@@ -330,6 +430,28 @@
                 this.amount = value === '' ? '' : Math.min(value, this.remaining);
             },
             useMax() { this.setAmount(this.remaining); },
+        };
+    }
+
+    function soReturnForm() {
+        return {
+            open: false,
+            // selected: { [sale_item_id]: qty }
+            selected: {},
+            toggle(itemId, maxQty, checked) {
+                if (checked) {
+                    this.selected[itemId] = maxQty;
+                } else {
+                    delete this.selected[itemId];
+                }
+            },
+            clamp(itemId, maxQty) {
+                let qty = this.selected[itemId];
+                if (qty === '' || qty === null || isNaN(qty)) {
+                    return;
+                }
+                this.selected[itemId] = Math.max(1, Math.min(qty, maxQty));
+            },
         };
     }
 

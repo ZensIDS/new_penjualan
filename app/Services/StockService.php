@@ -6,6 +6,8 @@ use App\Models\Product;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseReturnItem;
 use App\Models\SaleItem;
+use App\Models\SaleItemAllocation;
+use App\Models\SaleReturnItemAllocation;
 use App\Models\StockBatch;
 use App\Models\StockMovement;
 use RuntimeException;
@@ -146,6 +148,82 @@ class StockService
         foreach (array_keys($affectedProductIds) as $productId) {
             $this->syncProductQtyOnHand($productId);
         }
+    }
+
+    /**
+     * Kembalikan qty ke SATU batch tertentu (lewat SaleItemAllocation asalnya)
+     * karena customer meretur sebagian/seluruh qty dari baris SO tsb. Beda dari
+     * reverseAllocations() (yang selalu mengembalikan qty_taken PENUH — dipakai
+     * utk edit/hapus SO), method ini menerima qty parsial sehingga bisa dipakai
+     * utk retur sebagian, dan hasilnya dicatat via $returnAlloc (SaleReturnItemAllocation)
+     * supaya jejak "sudah diretur berapa dari alokasi ini" tetap akurat.
+     */
+    public function returnFromCustomer(SaleItemAllocation $allocation, int $qty, string $returnDate, SaleReturnItemAllocation $returnAlloc): void
+    {
+        if ($qty <= 0) {
+            throw new RuntimeException('Qty retur harus lebih dari 0.');
+        }
+
+        // Lock baris batch supaya aman dari race condition (wajib dipanggil
+        // di dalam DB::transaction()).
+        $batch = StockBatch::where('id', $allocation->stock_batch_id)->lockForUpdate()->first();
+
+        if (! $batch) {
+            throw new RuntimeException('Batch stok asal untuk alokasi ini tidak ditemukan.');
+        }
+
+        $batch->qty_remaining += $qty;
+        $batch->save();
+
+        StockMovement::create([
+            'product_id'      => $batch->product_id,
+            'stock_batch_id'  => $batch->id,
+            'type'            => 'in',
+            'qty'             => $qty,
+            'movement_date'   => $returnDate,
+            'reference_type'  => 'sale_return_item',
+            'reference_id'    => $returnAlloc->sale_return_item_id,
+            'note'            => "Retur penjualan dari customer — SO #{$allocation->saleItem->salesOrder->so_number}",
+        ]);
+
+        $this->syncProductQtyOnHand($batch->product_id);
+    }
+
+    /**
+     * Kebalikan dari returnFromCustomer() — keluarkan lagi qty dari batch saat
+     * sebuah retur SO dihapus/dibatalkan. TIDAK selalu aman seperti kebalikan
+     * retur PO: barang yang sudah kembali ke stok bisa saja sudah kadung terjual
+     * lagi atau diretur ke supplier, jadi divalidasi dulu terhadap qty_remaining
+     * batch saat ini.
+     *
+     * @throws RuntimeException kalau qty batch tidak cukup untuk dikeluarkan lagi
+     */
+    public function undoReturnFromCustomer(SaleReturnItemAllocation $returnAlloc, string $movementDate): void
+    {
+        $batch = StockBatch::where('id', $returnAlloc->stock_batch_id)->lockForUpdate()->first();
+
+        if (! $batch || $returnAlloc->qty > $batch->qty_remaining) {
+            $available = $batch->qty_remaining ?? 0;
+            throw new RuntimeException(
+                "Retur tidak bisa dibatalkan: stok produk \"{$returnAlloc->saleReturnItem->product->name}\" dari batch ini sudah kadung terjual lagi atau diretur ke supplier ({$available} tersisa, butuh {$returnAlloc->qty})."
+            );
+        }
+
+        $batch->qty_remaining -= $returnAlloc->qty;
+        $batch->save();
+
+        StockMovement::create([
+            'product_id'      => $batch->product_id,
+            'stock_batch_id'  => $batch->id,
+            'type'            => 'out',
+            'qty'             => $returnAlloc->qty,
+            'movement_date'   => $movementDate,
+            'reference_type'  => 'sale_return_item',
+            'reference_id'    => $returnAlloc->sale_return_item_id,
+            'note'            => 'Pembatalan retur penjualan',
+        ]);
+
+        $this->syncProductQtyOnHand($batch->product_id);
     }
 
     /**
