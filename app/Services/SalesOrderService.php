@@ -116,6 +116,48 @@ class SalesOrderService
     }
 
     /**
+     * Edit pembayaran yang sudah tercatat (koreksi salah input nominal/tanggal/dll).
+     * paid_amount & payment_status SO dihitung ulang otomatis, dan entry cash_flow
+     * terkait ikut disinkronkan — semua dalam satu transaksi supaya konsisten.
+     *
+     * @param array $data ['payment_date', 'amount', 'method', 'note']
+     *
+     * @throws \RuntimeException kalau nominal baru bikin total pembayaran melebihi total SO
+     */
+    public function updatePayment(SalesPayment $payment, array $data): SalesPayment
+    {
+        return DB::transaction(function () use ($payment, $data) {
+            $so = $payment->salesOrder()->lockForUpdate()->first();
+
+            $oldAmount = (float) $payment->amount;
+            $newAmount = (float) $data['amount'];
+            $newPaidTotal = (float) $so->paid_amount - $oldAmount + $newAmount;
+
+            if ($newPaidTotal > (float) $so->total_amount) {
+                $maxAllowed = $oldAmount + ((float) $so->total_amount - (float) $so->paid_amount);
+                throw new \RuntimeException(
+                    "Nominal baru (Rp {$newAmount}) membuat total pembayaran melebihi total SO. Maksimal untuk pembayaran ini: Rp {$maxAllowed}."
+                );
+            }
+
+            $payment->update([
+                'payment_date' => $data['payment_date'],
+                'amount'       => $newAmount,
+                'method'       => $data['method'],
+                'note'         => $data['note'] ?? null,
+            ]);
+
+            $so->paid_amount = $newPaidTotal;
+            $so->payment_status = $this->resolvePaymentStatus($so->total_amount, $newPaidTotal);
+            $so->save();
+
+            $this->cashFlowService->updateForSource($payment, $data['payment_date'], $newAmount);
+
+            return $payment->fresh();
+        });
+    }
+
+    /**
      * Update SO yang sudah ada: ganti data utama + replace semua item lama
      * dengan item baru. Alokasi FIFO lama dikembalikan ke batch asal dulu,
      * baru item baru dialokasikan ulang. HANYA boleh dipanggil selagi SO

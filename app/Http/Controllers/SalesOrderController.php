@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreSalesOrderRequest;
 use App\Http\Requests\StoreSalesPaymentRequest;
 use App\Http\Requests\UpdateSalesOrderRequest;
+use App\Http\Requests\UpdateSalesPaymentRequest;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\SalesOrder;
+use App\Models\SalesPayment;
 use App\Models\StockBatch;
 use App\Services\SalesOrderService;
 
@@ -175,5 +177,24 @@ class SalesOrderController extends Controller
         }
 
         return back()->with('success', 'Pembayaran berhasil dicatat.');
+    }
+
+    /**
+     * Edit pembayaran yang sudah tercatat (koreksi nominal/tanggal/dll).
+     * paid_amount, payment_status SO, dan ledger cash_flow ikut disinkronkan ulang.
+     */
+    public function updatePayment(UpdateSalesPaymentRequest $request, SalesOrder $salesOrder, SalesPayment $payment)
+    {
+        abort_unless($payment->sales_order_id === $salesOrder->id, 404);
+
+        $validated = $request->validated();
+
+        try {
+            $this->service->updatePayment($payment, $validated);
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Pembayaran berhasil diperbarui.');
     }
 }

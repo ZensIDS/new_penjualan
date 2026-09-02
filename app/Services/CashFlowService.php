@@ -30,4 +30,19 @@ class CashFlowService
             'description'      => $description,
         ]);
     }
+
+    /**
+     * Sinkronkan ulang entry cash_flow milik satu source (mis. PurchasePayment/SalesPayment)
+     * yang datanya baru saja diedit — dipakai saat payment di-edit supaya ledger arus kas
+     * ikut berubah, bukan dobel/nyisa entry lama.
+     */
+    public function updateForSource(Model $source, string $date, float $amount): void
+    {
+        CashFlow::where('source_type', get_class($source))
+            ->where('source_id', $source->getKey())
+            ->update([
+                'transaction_date' => $date,
+                'amount'           => $amount,
+            ]);
+    }
 }

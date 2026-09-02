@@ -100,6 +100,8 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
         ->name('purchase-orders.destroy');
     Route::post('purchase-orders/{purchaseOrder}/payments', [PurchaseOrderController::class, 'storePayment'])
         ->name('purchase-orders.payments.store');
+    Route::put('purchase-orders/{purchaseOrder}/payments/{payment}', [PurchaseOrderController::class, 'updatePayment'])
+        ->name('purchase-orders.payments.update');
 
     Route::post('sales-orders', [SalesOrderController::class, 'store'])
         ->name('sales-orders.store');
@@ -109,6 +111,8 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
         ->name('sales-orders.destroy');
     Route::post('sales-orders/{salesOrder}/payments', [SalesOrderController::class, 'storePayment'])
         ->name('sales-orders.payments.store');
+    Route::put('sales-orders/{salesOrder}/payments/{payment}', [SalesOrderController::class, 'updatePayment'])
+        ->name('sales-orders.payments.update');
 
     Route::resource('products', ProductController::class)
         ->only(['store', 'update', 'destroy']);

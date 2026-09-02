@@ -99,6 +99,48 @@ class PurchaseOrderService
     }
 
     /**
+     * Edit pembayaran yang sudah tercatat (koreksi salah input nominal/tanggal/dll).
+     * paid_amount & payment_status PO dihitung ulang otomatis, dan entry cash_flow
+     * terkait ikut disinkronkan — semua dalam satu transaksi supaya konsisten.
+     *
+     * @param array $data ['payment_date', 'amount', 'method', 'note']
+     *
+     * @throws \RuntimeException kalau nominal baru bikin total pembayaran melebihi total PO
+     */
+    public function updatePayment(PurchasePayment $payment, array $data): PurchasePayment
+    {
+        return DB::transaction(function () use ($payment, $data) {
+            $po = $payment->purchaseOrder()->lockForUpdate()->first();
+
+            $oldAmount = (float) $payment->amount;
+            $newAmount = (float) $data['amount'];
+            $newPaidTotal = (float) $po->paid_amount - $oldAmount + $newAmount;
+
+            if ($newPaidTotal > (float) $po->total_amount) {
+                $maxAllowed = $oldAmount + ((float) $po->total_amount - (float) $po->paid_amount);
+                throw new \RuntimeException(
+                    "Nominal baru (Rp {$newAmount}) membuat total pembayaran melebihi total PO. Maksimal untuk pembayaran ini: Rp {$maxAllowed}."
+                );
+            }
+
+            $payment->update([
+                'payment_date' => $data['payment_date'],
+                'amount'       => $newAmount,
+                'method'       => $data['method'],
+                'note'         => $data['note'] ?? null,
+            ]);
+
+            $po->paid_amount = $newPaidTotal;
+            $po->payment_status = $this->resolvePaymentStatus($po->total_amount, $newPaidTotal);
+            $po->save();
+
+            $this->cashFlowService->updateForSource($payment, $data['payment_date'], $newAmount);
+
+            return $payment->fresh();
+        });
+    }
+
+    /**
      * Update PO yang sudah ada: ganti data utama + replace semua item lama
      * dengan item baru (batch stok lama dihapus, batch baru dibuat).
      * HANYA boleh dipanggil selagi PO belum dibayar sama sekali dan

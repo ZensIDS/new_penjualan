@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StorePurchaseOrderRequest;
 use App\Http\Requests\StorePurchasePaymentRequest;
 use App\Http\Requests\UpdatePurchaseOrderRequest;
+use App\Http\Requests\UpdatePurchasePaymentRequest;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
+use App\Models\PurchasePayment;
 use App\Models\Supplier;
 use App\Services\PurchaseOrderService;
 use Illuminate\Http\JsonResponse;
@@ -148,5 +150,24 @@ class PurchaseOrderController extends Controller
         }
 
         return back()->with('success', 'Pembayaran berhasil dicatat.');
+    }
+
+    /**
+     * Edit pembayaran yang sudah tercatat (koreksi nominal/tanggal/dll).
+     * paid_amount, payment_status PO, dan ledger cash_flow ikut disinkronkan ulang.
+     */
+    public function updatePayment(UpdatePurchasePaymentRequest $request, PurchaseOrder $purchaseOrder, PurchasePayment $payment)
+    {
+        abort_unless($payment->purchase_order_id === $purchaseOrder->id, 404);
+
+        $validated = $request->validated();
+
+        try {
+            $this->service->updatePayment($payment, $validated);
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Pembayaran berhasil diperbarui.');
     }
 }

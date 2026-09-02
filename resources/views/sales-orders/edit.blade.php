@@ -10,7 +10,7 @@
         {{ Illuminate\Support\Js::from(old('items', $salesOrder->items->map(fn ($item) => [
             'product_id' => $item->product_id,
             'qty'        => $item->qty,
-            'sell_price' => $item->sell_price,
+            'sell_price' => (int) round($item->sell_price),
         ])->values())) }}
     )"
     x-cloak

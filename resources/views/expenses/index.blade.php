@@ -208,7 +208,7 @@
                 this.form = {
                     expense_category_id: expense.expense_category_id,
                     expense_date: expense.expense_date?.substring(0, 10),
-                    amount: expense.amount,
+                    amount: Math.round(parseFloat(expense.amount)) || '',
                     description: expense.description,
                 };
                 this.errors = {};

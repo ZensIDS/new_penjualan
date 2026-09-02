@@ -119,15 +119,82 @@
                 @else
                     <div class="divide-y divide-ink/[0.06] text-sm">
                         @foreach ($purchaseOrder->payments->sortByDesc('payment_date') as $payment)
-                            <div class="flex items-center justify-between px-6 py-3.5">
-                                <div>
-                                    <p class="font-medium">Rp {{ number_format($payment->amount, 0, ',', '.') }}</p>
-                                    <p class="text-xs text-ink/40">
-                                        {{ $payment->payment_date->translatedFormat('d M Y') }} &middot;
-                                        {{ ['cash' => 'Tunai', 'transfer' => 'Transfer', 'other' => 'Lainnya'][$payment->method] ?? $payment->method }}
-                                        @if ($payment->note) &middot; {{ $payment->note }} @endif
-                                    </p>
+                            <div x-data="paymentEditRow({{ (int) round($payment->amount) }}, {{ (int) round($payment->amount + $purchaseOrder->remaining_balance) }})" x-cloak>
+                                <div class="flex items-center justify-between px-6 py-3.5" x-show="!editing">
+                                    <div>
+                                        <p class="font-medium">Rp {{ number_format($payment->amount, 0, ',', '.') }}</p>
+                                        <p class="text-xs text-ink/40">
+                                            {{ $payment->payment_date->translatedFormat('d M Y') }} &middot;
+                                            {{ ['cash' => 'Tunai', 'transfer' => 'Transfer', 'other' => 'Lainnya'][$payment->method] ?? $payment->method }}
+                                            @if ($payment->note) &middot; {{ $payment->note }} @endif
+                                        </p>
+                                    </div>
+                                    @if (auth()->user()->isSuperadmin())
+                                        <button type="button" @click="editing = true"
+                                                class="text-ink/40 hover:text-amber-700 p-1.5 shrink-0" title="Edit pembayaran">
+                                            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                                        </button>
+                                    @endif
                                 </div>
+
+                                @if (auth()->user()->isSuperadmin())
+                                    <form x-show="editing" x-transition method="POST"
+                                          action="{{ route('purchase-orders.payments.update', [$purchaseOrder, $payment]) }}"
+                                          class="px-6 py-4 bg-amber-50/40 space-y-3">
+                                        @csrf
+                                        @method('PUT')
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div>
+                                                <label class="block text-xs font-medium text-ink/50 mb-1">Tanggal Bayar</label>
+                                                <input type="date" name="payment_date" value="{{ $payment->payment_date->toDateString() }}"
+                                                       class="w-full rounded-lg border border-ink/12 px-3 py-2 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-ink/50 mb-1">
+                                                    Jumlah
+                                                    <button type="button" @click="setAmount(max)" class="text-amber-700 hover:text-amber-800 font-normal text-[11px]">(isi maksimal)</button>
+                                                </label>
+                                                <div class="relative">
+                                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink/40">Rp</span>
+                                                    <input type="text" inputmode="numeric"
+                                                           :value="formatRupiah(amount)"
+                                                           @input="setAmount(parseRupiah($event.target.value)); $event.target.value = formatRupiah(amount)"
+                                                           class="w-full rounded-lg border border-ink/12 pl-8 pr-3 py-2 text-sm tnum focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                                                    <input type="hidden" name="amount" :value="amount">
+                                                </div>
+                                                <p class="text-[11px] mt-1" :class="amount === max ? 'text-amber-700 font-medium' : 'text-ink/40'">
+                                                    Maks. untuk pembayaran ini: Rp <span x-text="formatRupiah(max)"></span>
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-ink/50 mb-1">Metode</label>
+                                                <select name="method" class="w-full rounded-lg border border-ink/12 px-3 py-2 text-sm bg-white focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                                                    <option value="cash" @selected($payment->method === 'cash')>Tunai</option>
+                                                    <option value="transfer" @selected($payment->method === 'transfer')>Transfer</option>
+                                                    <option value="other" @selected($payment->method === 'other')>Lainnya</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-ink/50 mb-1">Catatan</label>
+                                                <input type="text" name="note" value="{{ $payment->note }}" placeholder="Opsional"
+                                                       class="w-full rounded-lg border border-ink/12 px-3 py-2 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                                            </div>
+                                        </div>
+                                        <p class="text-xs text-ink/40">
+                                            Mengubah nominal ini akan otomatis menghitung ulang sisa hutang & catatan arus kas terkait.
+                                        </p>
+                                        <div class="flex items-center gap-2">
+                                            <button type="submit"
+                                                    class="text-xs font-semibold px-4 py-2 rounded-lg bg-ink text-white hover:bg-ink/90 transition-colors">
+                                                Simpan
+                                            </button>
+                                            <button type="button" @click="editing = false"
+                                                    class="text-xs font-medium px-4 py-2 rounded-lg border border-ink/12 hover:bg-ink/[0.03] transition-colors">
+                                                Batal
+                                            </button>
+                                        </div>
+                                    </form>
+                                @endif
                             </div>
                         @endforeach
                     </div>
@@ -231,6 +298,20 @@
                 this.amount = value === '' ? '' : Math.min(value, this.remaining);
             },
             useMax() { this.setAmount(this.remaining); },
+        };
+    }
+
+    function paymentEditRow(initialAmount, max) {
+        return {
+            editing: false,
+            amount: initialAmount,
+            max,
+            // Nominal edit tidak boleh melebihi (nominal lama + sisa hutang saat ini) —
+            // itu batas maksimal yang mungkin tanpa bikin total pembayaran > total PO,
+            // sudah memperhitungkan pembayaran-pembayaran lain yang sudah ada.
+            setAmount(value) {
+                this.amount = value === '' ? '' : Math.min(value, this.max);
+            },
         };
     }
 </script>
