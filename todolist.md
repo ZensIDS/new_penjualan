@@ -1,5 +1,42 @@
 # TODO — Sistem Inventaris, Operasional & Keuangan
 
+**Fitur baru — Export Excel untuk semua Laporan:** `ExcelStyler` (helper styling terpusat di
+`app/Services/Export/`) dipakai bareng oleh `ReportExportController` biar 5 laporan (Stok, Laba
+Rugi, Arus Kas, Hutang/AP, Piutang/AR) punya tampilan Excel yang konsisten (header gelap+putih,
+zebra row, format Rupiah otomatis, baris total di-highlight, freeze header, auto width) tanpa
+nulis style dari nol tiap laporan. Route baru di grup `reports.export.*`. Laporan Stok &
+AP/AR dapat rincian tambahan (Detail Batch / Riwayat Pembayaran) supaya nggak cuma ringkasan.
+
+**Peningkatan — Laporan Stok kini dijabarkan per batch:** baik di halaman web
+(`reports/stock.blade.php`, expand/collapse per produk) maupun di export Excel-nya, tiap produk
+sekarang menampilkan rincian tiap batch stok (FIFO) — tanggal masuk, harga beli, qty masuk, qty
+sisa, nilai per batch — bukan cuma total per produk. Total keseluruhan tetap ditampilkan di
+footer/baris total.
+
+**Bug fix — Nominal harga 100x lipat saat masuk halaman Edit PO/SO & modal Edit Expense:**
+`buy_price`/`sell_price`/`amount` di-cast `decimal:2` di model, jadi di-serialize ke JSON sebagai
+string (`"45000.00"`). Helper `formatRupiah`/`parseRupiah` di `layouts/app.blade.php` cuma
+membuang karakter non-digit, jadi `"45000.00"` → `"4500000"` (Rp 4.500.000, bukan Rp 45.000).
+Fix: nilai dibulatkan ke integer dulu sebelum dikirim ke Alpine, baik di sisi Blade
+(`purchase-orders/edit.blade.php`, `sales-orders/edit.blade.php`, pakai `(int) round(...)`)
+maupun di sisi JS (`expenses/index.blade.php`, `openEdit()` pakai `Math.round(parseFloat(...))`).
+**Wajib diikuti**: field uang manapun yang dilempar ke Alpine lewat `Illuminate\Support\Js::from()`
+harus di-cast integer/float dulu, jangan biarkan string hasil cast `decimal:2` mentah.
+
+**Fitur baru — Edit pembayaran PO & SO (koreksi salah input):** riwayat pembayaran di halaman
+detail PO/SO sekarang punya tombol edit inline (khusus superadmin) — form muncul di tempat
+(Alpine `paymentEditRow`), bisa ubah tanggal/nominal/metode/catatan.
+`PurchaseOrderService::updatePayment()` / `SalesOrderService::updatePayment()` menghitung ulang
+`paid_amount` & `payment_status` PO/SO secara otomatis dalam satu transaksi DB (row PO/SO
+di-lock dulu), dan `CashFlowService::updateForSource()` menyinkronkan ulang entry `cash_flows`
+terkait supaya Laporan Arus Kas tetap akurat. **Batas nominal edit dihitung per-payment**:
+`nominal lama pembayaran ini + sisa hutang/piutang saat ini` — otomatis benar walau PO/SO sudah
+dibayar bertahap lebih dari 1 kali, karena `remaining_balance` yang ditampilkan sudah bersih dari
+semua pembayaran lain. Divalidasi di 2 lapis: client-side (JS clamp input + tombol "isi
+maksimal") dan server-side (`UpdatePurchasePaymentRequest`/`UpdateSalesPaymentRequest` +
+exception di service kalau tetap kelebihan). Route baru: `PUT
+{resource}/{order}/payments/{payment}`.
+
 **Fitur baru — Edit & Hapus PO/SO (khusus transaksi yang belum dibayar sama sekali):**
 
 - `PurchaseOrder`/`SalesOrder` dapat method `canBeModified()`: true kalau `payment_status ===
@@ -38,6 +75,8 @@ tabel `sales_orders`, daftar valid ada di `App\Models\SalesOrder::SOURCES` (`off
 `whatsapp`, `shopee` — gampang ditambah tanpa migration baru). Selalu wajib diisi
 (`required|in:...`), select-nya ditaruh sebaris dengan Catatan di form create & edit, dan
 ditampilkan sebagai badge di halaman detail SO.
+
+**Akan Dilanjutkan - Penambahan Pagination & Return Order:** Setiap page harus ada pagination, karena nantinya akan ada ribuan data. sehingga harusnya juga tidak hanya pagination tapi termasuk bagaimana agar page tetap optimal meskipun datanya sudah ribuan.
 
 ## ✅ Fase 1 — Database (Migration)
 
@@ -98,7 +137,9 @@ ditampilkan sebagai badge di halaman detail SO.
 
 - [x] `ReportService` — Stok breakdown, Laba Rugi, Cash Flow, AP (hutang), AR (piutang)
 - [x] `ReportController` + routes
-- [ ] View/Blade untuk tiap laporan (atau export Excel/PDF kalau dibutuhkan)
+- [x] View/Blade untuk tiap laporan (Stok, Laba Rugi, Arus Kas, AP, AR) — sudah ada semua
+- [x] Export Excel untuk semua laporan (`ReportExportController` + `ExcelStyler`, lihat catatan
+      fitur baru di atas)
 
 ## ✅ Fase 7 — Autentikasi & Otorisasi
 
@@ -120,11 +161,12 @@ ditampilkan sebagai badge di halaman detail SO.
 - [x] Form input PO (`purchase-orders/create.blade.php`) — dynamic add/remove item baris pakai
       Alpine, select2 per baris (produk + supplier), input Rupiah terformat, form submit biasa
       (bukan AJAX, sesuai pola controller yang redirect/back()->withErrors())
-- [ ] Form input SO (dynamic add item baris, tampilkan stok tersedia per produk)
+- [x] Form input SO (dynamic add item baris, tampilkan stok tersedia per produk)
 - [x] Halaman detail PO (`purchase-orders/show.blade.php`) — breakdown item + sisa batch,
       ringkasan pembayaran, riwayat pembayaran, form tambah pembayaran (superadmin, muncul
-      kalau masih ada sisa hutang)
-- [ ] Halaman detail SO (breakdown batch FIFO yang kepakai, histori pembayaran)
+      kalau masih ada sisa hutang), edit inline per pembayaran (lihat catatan fitur baru di atas)
+- [x] Halaman detail SO (breakdown batch FIFO yang kepakai, histori pembayaran, edit inline per
+      pembayaran sama seperti PO)
 - [x] Halaman Stok (`stock/index.blade.php`, route `stock.index`, menu "Persediaan → Stok") —
       view cek cepat: search instan nama produk (client-side), expand/collapse breakdown batch
       per produk, KPI ringkas. Data dari `ReportService::stockReport()` yang sama dipakai
@@ -134,7 +176,9 @@ ditampilkan sebagai badge di halaman detail SO.
       konsisten dengan token desain (border tipis, bukan shadow). Controller-nya sekarang
       return JSON untuk store/update/destroy (route create/edit dihapus dari `routes/web.php`
       karena tidak dipakai lagi).
-- [ ] Halaman laporan (Stok, Laba Rugi, Cash Flow, AP/AR) — Controller & Service sudah siap, tinggal buat view-nya
+- [x] Halaman laporan (Stok, Laba Rugi, Cash Flow, AP/AR) — sudah ada semua + export Excel
+      (lihat Fase 6 & catatan fitur baru di atas)
+- [ ] Penambahan Pagination pada setiap page yang memungkinkan diberikan pagination
 
 ## 🟡 Fase 9 — Data Pendukung
 
@@ -144,7 +188,6 @@ ditampilkan sebagai badge di halaman detail SO.
       sengaja 0 karena itu cache dari `StockService`), `SupplierSeeder` (4 supplier),
       `CustomerSeeder` (5 customer). Semua sudah didaftarkan di `DatabaseSeeder` dengan urutan
       `UserSeeder → CategorySeeder → ProductSeeder → SupplierSeeder → CustomerSeeder`.
-- [ ] Factory untuk testing otomatis
 
 ## ⬜ Fase 10 — Pengujian & Penyempurnaan
 
@@ -157,7 +200,4 @@ ditampilkan sebagai badge di halaman detail SO.
 
 **Belum diputuskan / perlu didiskusikan nanti:**
 
-- Multi-metode pembayaran dalam 1 transaksi → sudah diputuskan: TIDAK, 1 metode per baris.
-- Multi-gudang → sudah diputuskan: TIDAK, 1 lokasi saja.
-- Barang PO datang bertahap (partial receiving dari 1 PO) → belum dibahas, saat ini asumsi 1 PO item = langsung masuk stok penuh.
 - Retur penjualan / retur pembelian ke supplier → `StockService::reverseAllocations()` sudah disiapkan untuk retur penjualan, tapi alur Controller & Request-nya belum dibuat.
