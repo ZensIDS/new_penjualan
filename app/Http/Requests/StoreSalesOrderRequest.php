@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class StoreSalesOrderRequest extends FormRequest
 {
@@ -19,7 +18,7 @@ class StoreSalesOrderRequest extends FormRequest
             'customer_id'   => ['required', 'exists:customers,id'],
             'so_date'       => ['required', 'date'],
             'note'          => ['nullable', 'string', 'max:1000'],
-            'source'        => ['required', Rule::in(array_keys(\App\Models\SalesOrder::SOURCES))],
+            'source_id'     => ['required', 'exists:sale_sources,id'],
 
             'items'                    => ['required', 'array', 'min:1'],
             'items.*.product_id'       => ['required', 'exists:products,id'],

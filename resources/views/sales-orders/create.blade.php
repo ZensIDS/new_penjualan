@@ -7,6 +7,7 @@
     x-data="soCreateForm(
         {{ Illuminate\Support\Js::from($customers) }},
         {{ Illuminate\Support\Js::from($products) }},
+        {{ Illuminate\Support\Js::from($sources) }},
         {{ Illuminate\Support\Js::from(old('items', [['product_id' => '', 'qty' => 1, 'sell_price' => '']])) }}
     )"
     x-cloak
@@ -63,14 +64,21 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium mb-1.5">Asal Penjualan</label>
-                    <select name="source"
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="block text-sm font-medium">Asal Penjualan</label>
+                        <button type="button" @click="openSourceModal()"
+                                class="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800">
+                            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                            Asal Baru
+                        </button>
+                    </div>
+                    <select name="source_id" x-model="sourceId"
                             class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
-                        @foreach (\App\Models\SalesOrder::SOURCES as $value => $label)
-                            <option value="{{ $value }}" @selected(old('source', 'offline') === $value)>{{ $label }}</option>
-                        @endforeach
+                        <template x-for="s in sources" :key="s.id">
+                            <option :value="s.id" x-text="s.name"></option>
+                        </template>
                     </select>
-                    @error('source')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
+                    @error('source_id')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
                 </div>
             </div>
         </div>
@@ -262,15 +270,65 @@
             </div>
         </div>
     </div>
+
+    {{-- Modal Tambah Asal Penjualan Baru --}}
+    <div
+        x-show="sourceModalOpen"
+        x-cloak
+        class="fixed inset-0 z-[60] flex items-center justify-center px-4"
+    >
+        <div x-show="sourceModalOpen" x-transition.opacity @click="sourceModalOpen = false" class="absolute inset-0 bg-ink/50 backdrop-blur-sm"></div>
+
+        <div
+            x-show="sourceModalOpen"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            class="relative bg-white w-full max-w-md rounded-2xl shadow-panel max-h-[90vh] overflow-y-auto scroll-thin-light"
+        >
+            <div class="h-1.5 bg-gradient-to-r from-amber-400 to-amber-500 rounded-t-2xl"></div>
+
+            <div class="p-6">
+                <div class="flex items-center gap-3 mb-5">
+                    <span class="h-10 w-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
+                        <svg viewBox="0 0 24 24" class="h-5 w-5 text-amber-600" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M11.5 3H4v7.5L14 20.5l7.5-7.5L11.5 3Z"/><path stroke-linecap="round" d="M8 8h.01"/></svg>
+                    </span>
+                    <h2 class="font-display font-semibold text-lg">Tambah Asal Penjualan Baru</h2>
+                </div>
+
+                <form @submit.prevent="submitSource()">
+                    <div>
+                        <label class="block text-sm font-medium mb-1.5">Nama</label>
+                        <input type="text" x-model="sourceForm.name" x-ref="sourceNameInput" placeholder="Instagram, TikTok Shop, dll"
+                               class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                        <p class="text-xs text-red-600 mt-1" x-text="sourceErrors.name?.[0]"></p>
+                    </div>
+
+                    <p class="text-xs text-red-600 mt-3" x-show="sourceFlashError" x-text="sourceFlashError"></p>
+
+                    <div class="mt-6 flex justify-end gap-2">
+                        <button type="button" @click="sourceModalOpen = false"
+                                class="text-sm font-medium px-4 py-2.5 rounded-xl border border-ink/12 hover:bg-ink/[0.03] transition-colors">Batal</button>
+                        <button type="submit" :disabled="sourceSaving"
+                                class="text-sm font-semibold px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-ink shadow-glow hover:brightness-105 disabled:opacity-50 transition-all">
+                            <span x-text="sourceSaving ? 'Menyimpan...' : 'Simpan & Pilih'"></span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 @endsection
 
 @push('scripts')
 <script>
-    function soCreateForm(customers, products, initialItems) {
+    function soCreateForm(customers, products, sources, initialItems) {
         return {
             customers,
             products,
+            sources,
+            sourceId: {{ (int) old('source_id', 0) }} || (sources[0]?.id ?? ''),
             items: initialItems.map(i => ({
                 key: Math.random().toString(36).slice(2),
                 product_id: i.product_id || '',
@@ -321,6 +379,44 @@
                 }
 
                 this.customerFlashError = data.message || 'Gagal menambahkan customer.';
+            },
+
+            sourceModalOpen: false,
+            sourceSaving: false,
+            sourceErrors: {},
+            sourceFlashError: null,
+            sourceForm: { name: '' },
+
+            openSourceModal() {
+                this.sourceForm = { name: '' };
+                this.sourceErrors = {};
+                this.sourceFlashError = null;
+                this.sourceModalOpen = true;
+                this.$nextTick(() => this.$refs.sourceNameInput?.focus());
+            },
+
+            async submitSource() {
+                this.sourceSaving = true;
+                this.sourceErrors = {};
+                this.sourceFlashError = null;
+
+                const { ok, status, data } = await window.ajaxSend(`{{ route('sale-sources.store') }}`, 'POST', this.sourceForm);
+                this.sourceSaving = false;
+
+                if (ok) {
+                    const newSource = data.data;
+                    this.sources.push(newSource);
+                    this.sourceId = newSource.id;
+                    this.sourceModalOpen = false;
+                    return;
+                }
+
+                if (status === 422) {
+                    this.sourceErrors = data.errors || {};
+                    return;
+                }
+
+                this.sourceFlashError = data.message || 'Gagal menambahkan asal penjualan.';
             },
 
             addItem() {

@@ -11,6 +11,7 @@ use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchaseReturnController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReportExportController;
+use App\Http\Controllers\SaleSourceController;
 use App\Http\Controllers\SalesOrderController;
 use App\Http\Controllers\SalesReturnController;
 use App\Http\Controllers\StockController;
@@ -67,6 +68,7 @@ Route::middleware('auth')->group(function () {
     Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
     Route::get('suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
     Route::get('customers', [CustomerController::class, 'index'])->name('customers.index');
+    Route::get('sale-sources', [SaleSourceController::class, 'index'])->name('sale-sources.index');
     Route::get('expenses', [ExpenseController::class, 'index'])->name('expenses.index');
     Route::get('expense-categories', [ExpenseCategoryController::class, 'index'])->name('expense-categories.index');
 
@@ -140,6 +142,9 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
         ->only(['store', 'update', 'destroy']);
 
     Route::resource('customers', CustomerController::class)
+        ->only(['store', 'update', 'destroy']);
+
+    Route::resource('sale-sources', SaleSourceController::class)
         ->only(['store', 'update', 'destroy']);
 
     Route::resource('expenses', ExpenseController::class)

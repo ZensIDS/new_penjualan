@@ -163,7 +163,7 @@ class SalesOrderService
      * baru item baru dialokasikan ulang. HANYA boleh dipanggil selagi SO
      * belum dibayar sama sekali.
      *
-     * @param array $data ['customer_id', 'so_date', 'note', 'source']
+     * @param array $data ['customer_id', 'so_date', 'note', 'source_id']
      * @param array $items [['product_id', 'qty', 'sell_price'], ...]
      *
      * @throws \RuntimeException kalau SO sudah dibayar, atau stok tidak cukup untuk item baru
@@ -193,7 +193,7 @@ class SalesOrderService
                 'customer_id'  => $data['customer_id'],
                 'so_date'      => $data['so_date'],
                 'note'         => $data['note'] ?? null,
-                'source'       => $data['source'] ?? $so->source,
+                'source_id'    => $data['source_id'] ?? $so->source_id,
                 'total_amount' => $totalAmount,
                 'total_hpp'    => 0,
             ]);

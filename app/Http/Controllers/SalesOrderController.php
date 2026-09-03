@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateSalesOrderRequest;
 use App\Http\Requests\UpdateSalesPaymentRequest;
 use App\Models\Customer;
 use App\Models\Product;
+use App\Models\SaleSource;
 use App\Models\SalesOrder;
 use App\Models\SalesPayment;
 use App\Models\StockBatch;
@@ -58,13 +59,14 @@ class SalesOrderController extends Controller
     {
         $customers = Customer::orderBy('name')->get(['id', 'name']);
         $products = $this->productsForForm();
+        $sources = SaleSource::orderBy('name')->get(['id', 'name']);
 
-        return view('sales-orders.create', compact('customers', 'products'));
+        return view('sales-orders.create', compact('customers', 'products', 'sources'));
     }
 
     public function show(SalesOrder $salesOrder)
     {
-        $salesOrder->load(['customer', 'items.product', 'items.allocations.stockBatch', 'items.returnItems', 'payments', 'returns.items.product']);
+        $salesOrder->load(['customer', 'source', 'items.product', 'items.allocations.stockBatch', 'items.returnItems', 'payments', 'returns.items.product']);
 
         return view('sales-orders.show', compact('salesOrder'));
     }
@@ -80,6 +82,7 @@ class SalesOrderController extends Controller
         $salesOrder->load('items');
 
         $customers = Customer::orderBy('name')->get(['id', 'name']);
+        $sources = SaleSource::orderBy('name')->get(['id', 'name']);
         // Saat edit, qty yang lagi dipakai transaksi ini sendiri harus dianggap
         // "tersedia lagi" di form (supaya user bisa submit ulang qty yang sama
         // tanpa kena validasi stok kurang) — tambahkan balik qty existing per produk.
@@ -89,7 +92,7 @@ class SalesOrderController extends Controller
             $product->qty_on_hand += (int) ($existingQtyByProduct->get($product->id) ?? 0);
         });
 
-        return view('sales-orders.edit', compact('salesOrder', 'customers', 'products'));
+        return view('sales-orders.edit', compact('salesOrder', 'customers', 'products', 'sources'));
     }
 
     public function update(UpdateSalesOrderRequest $request, SalesOrder $salesOrder)
@@ -103,7 +106,7 @@ class SalesOrderController extends Controller
                     'customer_id' => $validated['customer_id'],
                     'so_date'     => $validated['so_date'],
                     'note'        => $validated['note'] ?? null,
-                    'source'      => $validated['source'],
+                    'source_id'   => $validated['source_id'],
                 ],
                 items: $validated['items'],
             );
@@ -144,7 +147,7 @@ class SalesOrderController extends Controller
                     'customer_id' => $validated['customer_id'],
                     'so_date'     => $validated['so_date'],
                     'note'        => $validated['note'] ?? null,
-                    'source'      => $validated['source'],
+                    'source_id'   => $validated['source_id'],
                 ],
                 items: $validated['items'],
                 initialPayment: $validated['initial_payment'] ?? null,

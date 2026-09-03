@@ -30,7 +30,7 @@
                     {{ $statusLabel }}
                 </span>
                 <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-ink/[0.06] text-ink/60">
-                    {{ \App\Models\SalesOrder::SOURCES[$salesOrder->source] ?? $salesOrder->source }}
+                    {{ $salesOrder->source?->name ?? '—' }}
                 </span>
             </div>
             <p class="text-sm text-ink/50">

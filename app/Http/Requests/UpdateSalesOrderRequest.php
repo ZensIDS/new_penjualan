@@ -2,9 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\Models\SalesOrder;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class UpdateSalesOrderRequest extends FormRequest
 {
@@ -23,7 +21,7 @@ class UpdateSalesOrderRequest extends FormRequest
             'customer_id'   => ['required', 'exists:customers,id'],
             'so_date'       => ['required', 'date'],
             'note'          => ['nullable', 'string', 'max:1000'],
-            'source'        => ['required', Rule::in(array_keys(SalesOrder::SOURCES))],
+            'source_id'     => ['required', 'exists:sale_sources,id'],
 
             'items'                    => ['required', 'array', 'min:1'],
             'items.*.product_id'       => ['required', 'exists:products,id'],

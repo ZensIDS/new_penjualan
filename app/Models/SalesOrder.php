@@ -6,14 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class SalesOrder extends Model
 {
-    // Daftar asal/channel penjualan yang valid — dipakai di validasi Request
-    // dan di dropdown form create/edit. Tambah entri di sini kalau ada channel baru.
-    public const SOURCES = [
-        'offline'  => 'Offline',
-        'whatsapp' => 'WhatsApp',
-        'shopee'   => 'Shopee',
-    ];
-
     protected $fillable = [
         'so_number',
         'customer_id',
@@ -23,7 +15,7 @@ class SalesOrder extends Model
         'paid_amount',
         'payment_status',
         'note',
-        'source',
+        'source_id',
     ];
 
     protected $casts = [
@@ -36,6 +28,11 @@ class SalesOrder extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function source()
+    {
+        return $this->belongsTo(SaleSource::class);
     }
 
     public function items()
