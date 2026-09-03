@@ -35,9 +35,12 @@
     class="fixed inset-y-0 left-0 z-40 w-64 bg-ink text-white flex flex-col transition-transform duration-200 ease-out lg:static lg:translate-x-0"
 >
     {{-- Brand --}}
-    <div class="h-16 flex items-center px-6 border-b border-white/10 shrink-0">
+    <div class="h-16 flex items-center gap-2.5 px-6 border-b border-white/10 shrink-0">
+        <span class="h-7 w-7 rounded-lg bg-amber-400 flex items-center justify-center shrink-0">
+            <span class="font-display font-bold text-ink text-sm">B</span>
+        </span>
         <a href="{{ route('dashboard') }}" class="font-display font-semibold text-lg tracking-tight">
-            Volt<span class="text-white/40">Stock</span>
+            BerlianZ<span class="text-white/40">Store</span>
         </a>
     </div>
 

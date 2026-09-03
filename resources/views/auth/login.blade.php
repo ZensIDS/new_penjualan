@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Masuk — VoltStock</title>
+    <title>Masuk — BerlianzStore</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -22,39 +22,35 @@
         }
     </script>
 </head>
-<body class="h-full bg-white font-sans text-ink antialiased">
-    <div class="min-h-full lg:grid lg:grid-cols-2">
+<body class="h-full bg-[#fafaf9] font-sans text-ink antialiased">
+    <div class="relative min-h-full flex items-center justify-center overflow-hidden px-6 py-12">
 
-        {{-- Panel kiri: brand, hanya tampil di layar besar --}}
-        <div class="hidden lg:flex flex-col justify-between bg-ink text-white p-12">
-            <div class="font-display font-semibold text-xl tracking-tight">
-                Volt<span class="text-white/40">Stock</span>
-            </div>
-            <div class="max-w-sm">
-                <p class="font-display text-3xl leading-snug mb-4">
-                    Satu sistem untuk stok, penjualan, dan kas bisnismu.
-                </p>
-                <p class="text-white/50 text-sm leading-relaxed">
-                    Pelacakan batch FIFO, hutang-piutang, dan laporan laba rugi —
-                    tercatat rapi dari pembelian sampai laporan.
-                </p>
-            </div>
-            <p class="text-white/30 text-xs">&copy; {{ date('Y') }} VoltStock Internal System</p>
+        {{-- Aksen dekoratif tipis, tidak membagi layar — cuma nuansa di belakang card --}}
+        <div class="pointer-events-none absolute inset-0 -z-10">
+            <div class="absolute -top-32 left-1/2 -translate-x-1/2 h-[420px] w-[420px] rounded-full bg-amber-400/10 blur-3xl"></div>
+            <div class="absolute inset-0 opacity-[0.04]"
+                 style="background-image: radial-gradient(#111214 1px, transparent 1px); background-size: 22px 22px;"></div>
         </div>
 
-        {{-- Panel kanan: form login --}}
-        <div class="flex items-center justify-center p-6 sm:p-12">
-            <div class="w-full max-w-sm">
+        <div class="w-full max-w-sm">
 
-                <div class="lg:hidden font-display font-semibold text-xl tracking-tight mb-10">
-                    Volt<span class="text-ink/40">Stock</span>
+            {{-- Brand mark --}}
+            <div class="flex flex-col items-center text-center mb-8">
+                {{--  <div class="h-11 w-11 rounded-xl bg-ink flex items-center justify-center mb-4 shadow-lg shadow-ink/10">
+                    <span class="font-display font-bold text-amber-400 text-lg">B</span>
+                </div>  --}}
+                <div class="font-display font-semibold text-xl tracking-tight">
+                    BerlianZ<span class="text-ink/40">Store</span>
                 </div>
+            </div>
 
-                <h1 class="font-display font-semibold text-2xl mb-1">Masuk</h1>
-                <p class="text-ink/50 text-sm mb-8">Masukkan username dan kata sandi akunmu.</p>
+            {{-- Card login --}}
+            <div class="bg-white border border-ink/10 rounded-2xl shadow-card p-7 sm:p-8">
+                <h1 class="font-display font-semibold text-xl mb-1">Masuk</h1>
+                <p class="text-ink/50 text-sm mb-7">Masukkan username dan kata sandi akunmu.</p>
 
                 @if ($errors->any())
-                    <div class="mb-6 border border-red-900/20 bg-red-50 text-red-900 text-sm px-4 py-3">
+                    <div class="mb-6 rounded-lg border border-red-900/10 bg-red-50 text-red-800 text-sm px-4 py-3">
                         {{ $errors->first() }}
                     </div>
                 @endif
@@ -71,7 +67,7 @@
                             value="{{ old('username') }}"
                             required
                             autofocus
-                            class="w-full border border-ink/15 focus:border-ink focus:outline-none px-3.5 py-2.5 text-sm transition-colors"
+                            class="w-full rounded-lg border border-ink/15 focus:border-ink focus:outline-none focus:ring-2 focus:ring-amber-400/30 px-3.5 py-2.5 text-sm transition-colors"
                             placeholder="cth. budi.admin"
                         >
                     </div>
@@ -83,24 +79,26 @@
                             name="password"
                             type="password"
                             required
-                            class="w-full border border-ink/15 focus:border-ink focus:outline-none px-3.5 py-2.5 text-sm transition-colors"
+                            class="w-full rounded-lg border border-ink/15 focus:border-ink focus:outline-none focus:ring-2 focus:ring-amber-400/30 px-3.5 py-2.5 text-sm transition-colors"
                             placeholder="••••••••"
                         >
                     </div>
 
                     <label class="flex items-center gap-2 text-sm text-ink/60">
-                        <input type="checkbox" name="remember" class="border-ink/30">
+                        <input type="checkbox" name="remember" class="rounded border-ink/30">
                         Ingat saya
                     </label>
 
                     <button
                         type="submit"
-                        class="w-full bg-ink text-white py-2.5 text-sm font-medium hover:bg-ink/90 transition-colors"
+                        class="w-full rounded-lg bg-ink text-white py-2.5 text-sm font-medium hover:bg-ink/90 transition-colors"
                     >
                         Masuk
                     </button>
                 </form>
             </div>
+
+            <p class="text-center text-xs text-ink/35 mt-6">&copy; {{ date('Y') }} BerlianZStore</p>
         </div>
     </div>
 </body>
