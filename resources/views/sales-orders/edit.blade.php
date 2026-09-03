@@ -37,7 +37,14 @@
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6 mb-6">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium mb-1.5">Customer</label>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="block text-sm font-medium">Customer</label>
+                        <button type="button" @click="openCustomerModal()"
+                                class="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800">
+                            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                            Customer Baru
+                        </button>
+                    </div>
                     <div class="relative">
                         <select x-ref="customerSelect" name="customer_id" x-init="initCustomerSelect($el)">
                             <option value="">— Pilih customer —</option>
@@ -174,6 +181,77 @@
         </div>
     </form>
 
+    {{-- Modal Tambah Customer Baru --}}
+    <div
+        x-show="customerModalOpen"
+        x-cloak
+        class="fixed inset-0 z-[60] flex items-center justify-center px-4"
+    >
+        <div x-show="customerModalOpen" x-transition.opacity @click="customerModalOpen = false" class="absolute inset-0 bg-ink/50 backdrop-blur-sm"></div>
+
+        <div
+            x-show="customerModalOpen"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            class="relative bg-white w-full max-w-md rounded-2xl shadow-panel max-h-[90vh] overflow-y-auto scroll-thin-light"
+        >
+            <div class="h-1.5 bg-gradient-to-r from-amber-400 to-amber-500 rounded-t-2xl"></div>
+
+            <div class="p-6">
+                <div class="flex items-center gap-3 mb-5">
+                    <span class="h-10 w-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
+                        <svg viewBox="0 0 24 24" class="h-5 w-5 text-amber-600" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-6 9v-1c0-2.5 2.5-4.5 6-4.5s6 2 6 4.5v1"/></svg>
+                    </span>
+                    <h2 class="font-display font-semibold text-lg">Tambah Customer Baru</h2>
+                </div>
+
+                <form @submit.prevent="submitCustomer()">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1.5">Nama</label>
+                            <input type="text" x-model="customerForm.name" x-ref="customerNameInput"
+                                   class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                            <p class="text-xs text-red-600 mt-1" x-text="customerErrors.name?.[0]"></p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium mb-1.5">Telepon</label>
+                            <input type="text" x-model="customerForm.phone"
+                                   class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                            <p class="text-xs text-red-600 mt-1" x-text="customerErrors.phone?.[0]"></p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium mb-1.5">Email</label>
+                            <input type="email" x-model="customerForm.email"
+                                   class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                            <p class="text-xs text-red-600 mt-1" x-text="customerErrors.email?.[0]"></p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium mb-1.5">Alamat</label>
+                            <textarea x-model="customerForm.address" rows="3"
+                                      class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow"></textarea>
+                            <p class="text-xs text-red-600 mt-1" x-text="customerErrors.address?.[0]"></p>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-red-600 mt-3" x-show="customerFlashError" x-text="customerFlashError"></p>
+
+                    <div class="mt-6 flex justify-end gap-2">
+                        <button type="button" @click="customerModalOpen = false"
+                                class="text-sm font-medium px-4 py-2.5 rounded-xl border border-ink/12 hover:bg-ink/[0.03] transition-colors">Batal</button>
+                        <button type="submit" :disabled="customerSaving"
+                                class="text-sm font-semibold px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-ink shadow-glow hover:brightness-105 disabled:opacity-50 transition-all">
+                            <span x-text="customerSaving ? 'Menyimpan...' : 'Simpan & Pilih'"></span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     {{-- Modal Tambah Asal Penjualan Baru --}}
     <div
         x-show="sourceModalOpen"
@@ -238,6 +316,49 @@
                 qty: i.qty || 1,
                 sell_price: i.sell_price || '',
             })),
+
+            customerModalOpen: false,
+            customerSaving: false,
+            customerErrors: {},
+            customerFlashError: null,
+            customerForm: { name: '', phone: '', email: '', address: '' },
+
+            openCustomerModal() {
+                this.customerForm = { name: '', phone: '', email: '', address: '' };
+                this.customerErrors = {};
+                this.customerFlashError = null;
+                this.customerModalOpen = true;
+                this.$nextTick(() => this.$refs.customerNameInput?.focus());
+            },
+
+            async submitCustomer() {
+                this.customerSaving = true;
+                this.customerErrors = {};
+                this.customerFlashError = null;
+
+                const { ok, status, data } = await window.ajaxSend(`{{ route('customers.store') }}`, 'POST', this.customerForm);
+                this.customerSaving = false;
+
+                if (ok) {
+                    const newCustomer = data.data;
+                    this.customers.push(newCustomer);
+                    this.customerModalOpen = false;
+
+                    // Pilih otomatis customer yang baru dibuat di select2, tanpa reload
+                    // halaman — supaya item barang yang sudah diisi tidak ikut hilang.
+                    this.$nextTick(() => {
+                        $(this.$refs.customerSelect).val(String(newCustomer.id)).trigger('change.select2');
+                    });
+                    return;
+                }
+
+                if (status === 422) {
+                    this.customerErrors = data.errors || {};
+                    return;
+                }
+
+                this.customerFlashError = data.message || 'Gagal menambahkan customer.';
+            },
 
             sourceModalOpen: false,
             sourceSaving: false,
