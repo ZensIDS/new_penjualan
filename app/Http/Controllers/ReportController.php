@@ -49,7 +49,7 @@ class ReportController extends Controller
         // tidak nge-render seluruh transaksi kas dalam rentang tanggal
         // sekaligus. KPI & grafik di atas tetap pakai $data (agregat semua
         // baris pada rentang tanggal terpilih).
-        $details = $this->reportService->cashFlowDetailsPaginated($start, $end, 25);
+        $details = $this->reportService->cashFlowDetailsPaginated($start, $end, 10);
 
         return view('reports.cash-flow', [
             'data'      => $data,
@@ -67,7 +67,7 @@ class ReportController extends Controller
     {
         $search = $request->input('search');
 
-        $data = $this->reportService->accountPayableReportPaginated($search, 25);
+        $data = $this->reportService->accountPayableReportPaginated($search, 10);
         $kpis = $this->reportService->payableKpis();
 
         return view('reports.payable', compact('data', 'kpis', 'search'));
@@ -77,10 +77,44 @@ class ReportController extends Controller
     {
         $search = $request->input('search');
 
-        $data = $this->reportService->accountReceivableReportPaginated($search, 25);
+        $data = $this->reportService->accountReceivableReportPaginated($search, 10);
         $kpis = $this->reportService->receivableKpis();
 
         return view('reports.receivable', compact('data', 'kpis', 'search'));
+    }
+
+    public function salesReturn(Request $request)
+    {
+        [$start, $end] = $this->resolveRange($request);
+        $search = $request->input('search');
+
+        $data = $this->reportService->salesReturnReportPaginated($start, $end, $search, 25);
+        $kpis = $this->reportService->salesReturnKpis($start, $end);
+
+        return view('reports.sales-return', [
+            'data'      => $data,
+            'kpis'      => $kpis,
+            'search'    => $search,
+            'startDate' => $start,
+            'endDate'   => $end,
+        ]);
+    }
+
+    public function purchaseReturn(Request $request)
+    {
+        [$start, $end] = $this->resolveRange($request);
+        $search = $request->input('search');
+
+        $data = $this->reportService->purchaseReturnReportPaginated($start, $end, $search, 10);
+        $kpis = $this->reportService->purchaseReturnKpis($start, $end);
+
+        return view('reports.purchase-return', [
+            'data'      => $data,
+            'kpis'      => $kpis,
+            'search'    => $search,
+            'startDate' => $start,
+            'endDate'   => $end,
+        ]);
     }
 
     /**

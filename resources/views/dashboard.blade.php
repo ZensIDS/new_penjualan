@@ -119,7 +119,9 @@
                     <span class="tnum">Rp {{ number_format($profitLoss['revenue_gross'], 0, ',', '.') }}</span>
                 </div>
                 <div class="flex items-center justify-between px-6 py-3.5">
-                    <span class="text-ink/60">Retur Penjualan (SO)</span>
+                    <span class="text-ink/60">
+                        <a href="{{ route('reports.sales-return', ['start_date' => $startDate, 'end_date' => $endDate]) }}" class="hover:text-amber-700 underline decoration-dotted underline-offset-2">Retur Penjualan (SO)</a>
+                    </span>
                     <span class="tnum text-red-700">- Rp {{ number_format($profitLoss['sales_return'], 0, ',', '.') }}</span>
                 </div>
                 <div class="px-6 py-3.5 font-medium bg-ink/[0.02]">
@@ -170,14 +172,14 @@
             <div class="divide-y divide-ink/[0.06] text-sm flex-1">
                 <div class="flex items-center justify-between px-6 py-3">
                     <span class="text-ink/60 flex items-center gap-1.5">
-                        <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+                        <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
                         Kas Masuk
                     </span>
                     <span class="tnum text-emerald-700">Rp {{ number_format($cashFlow['total_in'], 0, ',', '.') }}</span>
                 </div>
                 <div class="flex items-center justify-between px-6 py-3">
                     <span class="text-ink/60 flex items-center gap-1.5">
-                        <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 text-red-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                        <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 text-red-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
                         Kas Keluar
                     </span>
                     <span class="tnum text-red-700">Rp {{ number_format($cashFlow['total_out'], 0, ',', '.') }}</span>
@@ -191,7 +193,9 @@
                     <span class="tnum">Rp {{ number_format($profitLoss['purchase'], 0, ',', '.') }}</span>
                 </div>
                 <div class="flex items-center justify-between px-6 py-3">
-                    <span class="text-ink/60">Retur Pembelian (PO)</span>
+                    <span class="text-ink/60">
+                        <a href="{{ route('reports.purchase-return', ['start_date' => $startDate, 'end_date' => $endDate]) }}" class="hover:text-amber-700 underline decoration-dotted underline-offset-2">Retur Pembelian (PO)</a>
+                    </span>
                     <span class="tnum">Rp {{ number_format($profitLoss['purchase_return'], 0, ',', '.') }}</span>
                 </div>
             </div>

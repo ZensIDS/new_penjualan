@@ -76,6 +76,8 @@ Route::middleware('auth')->group(function () {
         Route::get('cash-flow', [ReportController::class, 'cashFlow'])->name('cash-flow');
         Route::get('payable', [ReportController::class, 'payable'])->name('payable');
         Route::get('receivable', [ReportController::class, 'receivable'])->name('receivable');
+        Route::get('sales-return', [ReportController::class, 'salesReturn'])->name('sales-return');
+        Route::get('purchase-return', [ReportController::class, 'purchaseReturn'])->name('purchase-return');
 
         Route::prefix('export')->name('export.')->group(function () {
             Route::get('stock', [ReportExportController::class, 'stock'])->name('stock');
@@ -83,6 +85,8 @@ Route::middleware('auth')->group(function () {
             Route::get('cash-flow', [ReportExportController::class, 'cashFlow'])->name('cash-flow');
             Route::get('payable', [ReportExportController::class, 'payable'])->name('payable');
             Route::get('receivable', [ReportExportController::class, 'receivable'])->name('receivable');
+            Route::get('sales-return', [ReportExportController::class, 'salesReturn'])->name('sales-return');
+            Route::get('purchase-return', [ReportExportController::class, 'purchaseReturn'])->name('purchase-return');
         });
     });
 });

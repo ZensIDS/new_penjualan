@@ -479,4 +479,163 @@ class ReportService
             ]),
         ];
     }
+
+    /**
+     * Laporan Retur Penjualan (SO) untuk rentang tanggal tertentu, berdasar
+     * return_date. Dipaginasi di server (sama seperti laporan AP/AR/Stok)
+     * supaya tetap ringan walau jumlah retur sudah banyak.
+     */
+    public function salesReturnReportPaginated(string $startDate, string $endDate, ?string $search = null, int $perPage = 25)
+    {
+        $query = $this->salesReturnQuery($startDate, $endDate, $search);
+
+        $paginator = $query->orderByDesc('return_date')->orderByDesc('id')->paginate($perPage)->withQueryString();
+
+        $paginator->setCollection(
+            $paginator->getCollection()->map(fn(SalesReturn $r) => $this->mapSalesReturn($r))
+        );
+
+        return $paginator;
+    }
+
+    /**
+     * Sama seperti salesReturnReportPaginated(), tapi ambil SEMUA baris
+     * sekaligus (tanpa pagination) — khusus dipakai untuk export Excel.
+     */
+    public function salesReturnReport(string $startDate, string $endDate)
+    {
+        return $this->salesReturnQuery($startDate, $endDate)
+            ->orderByDesc('return_date')->orderByDesc('id')
+            ->get()
+            ->map(fn(SalesReturn $r) => $this->mapSalesReturn($r));
+    }
+
+    private function salesReturnQuery(string $startDate, string $endDate, ?string $search = null)
+    {
+        $query = SalesReturn::with(['salesOrder.customer', 'items.product'])
+            ->whereBetween('return_date', [$startDate, $endDate]);
+
+        if (filled($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('return_number', 'like', '%' . $search . '%')
+                    ->orWhereHas('salesOrder', fn($so) => $so->where('so_number', 'like', '%' . $search . '%'))
+                    ->orWhereHas('salesOrder.customer', fn($c) => $c->where('name', 'like', '%' . $search . '%'));
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * KPI retur penjualan (jumlah retur, total nilai, total HPP) dihitung
+     * via agregasi SQL atas SELURUH retur pada rentang tanggal, independen
+     * dari pagination/pencarian di atas.
+     */
+    public function salesReturnKpis(string $startDate, string $endDate): array
+    {
+        $base = SalesReturn::whereBetween('return_date', [$startDate, $endDate]);
+
+        return [
+            'count'      => (clone $base)->count(),
+            'total'      => (float) (clone $base)->sum('total_amount'),
+            'total_hpp'  => (float) (clone $base)->sum('total_hpp'),
+        ];
+    }
+
+    private function mapSalesReturn(SalesReturn $r): array
+    {
+        return [
+            'return_number' => $r->return_number,
+            'return_date'   => $r->return_date->format('Y-m-d'),
+            'so_number'     => $r->salesOrder->so_number ?? '—',
+            'customer'      => $r->salesOrder->customer->name ?? '—',
+            'total_amount'  => (float) $r->total_amount,
+            'total_hpp'     => (float) $r->total_hpp,
+            'note'          => $r->note,
+            'items'         => $r->items->map(fn($item) => [
+                'product'    => $item->product->name ?? '—',
+                'qty'        => (int) $item->qty,
+                'sell_price' => (float) $item->sell_price,
+                'subtotal'   => (float) $item->subtotal,
+            ]),
+        ];
+    }
+
+    /**
+     * Laporan Retur Pembelian (PO) untuk rentang tanggal tertentu, berdasar
+     * return_date. Dipaginasi di server, sama seperti laporan retur penjualan.
+     */
+    public function purchaseReturnReportPaginated(string $startDate, string $endDate, ?string $search = null, int $perPage = 25)
+    {
+        $query = $this->purchaseReturnQuery($startDate, $endDate, $search);
+
+        $paginator = $query->orderByDesc('return_date')->orderByDesc('id')->paginate($perPage)->withQueryString();
+
+        $paginator->setCollection(
+            $paginator->getCollection()->map(fn(PurchaseReturn $r) => $this->mapPurchaseReturn($r))
+        );
+
+        return $paginator;
+    }
+
+    /**
+     * Sama seperti purchaseReturnReportPaginated(), tapi ambil SEMUA baris
+     * sekaligus (tanpa pagination) — khusus dipakai untuk export Excel.
+     */
+    public function purchaseReturnReport(string $startDate, string $endDate)
+    {
+        return $this->purchaseReturnQuery($startDate, $endDate)
+            ->orderByDesc('return_date')->orderByDesc('id')
+            ->get()
+            ->map(fn(PurchaseReturn $r) => $this->mapPurchaseReturn($r));
+    }
+
+    private function purchaseReturnQuery(string $startDate, string $endDate, ?string $search = null)
+    {
+        $query = PurchaseReturn::with(['purchaseOrder.supplier', 'items.product'])
+            ->whereBetween('return_date', [$startDate, $endDate]);
+
+        if (filled($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('return_number', 'like', '%' . $search . '%')
+                    ->orWhereHas('purchaseOrder', fn($po) => $po->where('po_number', 'like', '%' . $search . '%'))
+                    ->orWhereHas('purchaseOrder.supplier', fn($s) => $s->where('name', 'like', '%' . $search . '%'));
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * KPI retur pembelian (jumlah retur, total nilai) dihitung via agregasi
+     * SQL atas SELURUH retur pada rentang tanggal, independen dari
+     * pagination/pencarian di atas.
+     */
+    public function purchaseReturnKpis(string $startDate, string $endDate): array
+    {
+        $base = PurchaseReturn::whereBetween('return_date', [$startDate, $endDate]);
+
+        return [
+            'count' => (clone $base)->count(),
+            'total' => (float) (clone $base)->sum('total_amount'),
+        ];
+    }
+
+    private function mapPurchaseReturn(PurchaseReturn $r): array
+    {
+        return [
+            'return_number' => $r->return_number,
+            'return_date'   => $r->return_date->format('Y-m-d'),
+            'po_number'     => $r->purchaseOrder->po_number ?? '—',
+            'supplier'      => $r->purchaseOrder->supplier->name ?? '—',
+            'total_amount'  => (float) $r->total_amount,
+            'note'          => $r->note,
+            'items'         => $r->items->map(fn($item) => [
+                'product'   => $item->product->name ?? '—',
+                'qty'       => (int) $item->qty,
+                'buy_price' => (float) $item->buy_price,
+                'subtotal'  => (float) $item->subtotal,
+            ]),
+        ];
+    }
 }

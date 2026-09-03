@@ -258,6 +258,94 @@ class ReportExportController extends Controller
         return ExcelStyler::download($spreadsheet, 'laporan-piutang-' . now()->format('Y-m-d') . '.xlsx');
     }
 
+    public function salesReturn(Request $request)
+    {
+        [$start, $end] = $this->resolveRange($request);
+
+        $data = $this->reportService->salesReturnReport($start, $end);
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Retur Penjualan');
+
+        $colSpan = 7;
+        $period = 'Periode: ' . Carbon::parse($start)->translatedFormat('d M Y') . ' - ' . Carbon::parse($end)->translatedFormat('d M Y');
+        $row = ExcelStyler::title($sheet, 'Laporan Retur Penjualan (SO)', $period, $colSpan);
+
+        $row = ExcelStyler::summaryBlock($sheet, $row, [
+            ['label' => 'Jumlah Retur', 'value' => $data->count(), 'format' => ExcelStyler::FMT_NUMBER],
+            ['label' => 'Total Nilai Retur', 'value' => $data->sum('total_amount'), 'format' => ExcelStyler::FMT_RP],
+            ['label' => 'Total HPP Retur', 'value' => $data->sum('total_hpp'), 'format' => ExcelStyler::FMT_RP, 'highlight' => true],
+        ], $colSpan);
+
+        $row = ExcelStyler::header($sheet, $row, ['No. Retur', 'No. SO', 'Customer', 'Tgl Retur', 'Nilai Retur', 'HPP Retur', 'Catatan']);
+
+        $tableStart = $row;
+        $row = ExcelStyler::rows($sheet, $row, $data->map(fn($r) => [
+            $r['return_number'],
+            $r['so_number'],
+            $r['customer'],
+            Carbon::parse($r['return_date'])->format('d-m-Y'),
+            $r['total_amount'],
+            $r['total_hpp'],
+            $r['note'] ?? '',
+        ]), currencyCols: [5, 6]);
+
+        if ($data->isEmpty()) {
+            $sheet->mergeCells("A{$tableStart}:G{$tableStart}");
+            $sheet->setCellValue("A{$tableStart}", 'Tidak ada retur penjualan pada periode ini.');
+        } else {
+            ExcelStyler::totalsRow($sheet, $row, ['Total', '', '', '', $data->sum('total_amount'), $data->sum('total_hpp'), ''], currencyCols: [5, 6]);
+        }
+
+        ExcelStyler::setColumnWidths($sheet, [16, 16, 24, 12, 16, 16, 30]);
+
+        return ExcelStyler::download($spreadsheet, "laporan-retur-penjualan-{$start}_sd_{$end}.xlsx");
+    }
+
+    public function purchaseReturn(Request $request)
+    {
+        [$start, $end] = $this->resolveRange($request);
+
+        $data = $this->reportService->purchaseReturnReport($start, $end);
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Retur Pembelian');
+
+        $colSpan = 6;
+        $period = 'Periode: ' . Carbon::parse($start)->translatedFormat('d M Y') . ' - ' . Carbon::parse($end)->translatedFormat('d M Y');
+        $row = ExcelStyler::title($sheet, 'Laporan Retur Pembelian (PO)', $period, $colSpan);
+
+        $row = ExcelStyler::summaryBlock($sheet, $row, [
+            ['label' => 'Jumlah Retur', 'value' => $data->count(), 'format' => ExcelStyler::FMT_NUMBER],
+            ['label' => 'Total Nilai Retur', 'value' => $data->sum('total_amount'), 'format' => ExcelStyler::FMT_RP, 'highlight' => true],
+        ], $colSpan);
+
+        $row = ExcelStyler::header($sheet, $row, ['No. Retur', 'No. PO', 'Supplier', 'Tgl Retur', 'Nilai Retur', 'Catatan']);
+
+        $tableStart = $row;
+        $row = ExcelStyler::rows($sheet, $row, $data->map(fn($r) => [
+            $r['return_number'],
+            $r['po_number'],
+            $r['supplier'],
+            Carbon::parse($r['return_date'])->format('d-m-Y'),
+            $r['total_amount'],
+            $r['note'] ?? '',
+        ]), currencyCols: [5]);
+
+        if ($data->isEmpty()) {
+            $sheet->mergeCells("A{$tableStart}:F{$tableStart}");
+            $sheet->setCellValue("A{$tableStart}", 'Tidak ada retur pembelian pada periode ini.');
+        } else {
+            ExcelStyler::totalsRow($sheet, $row, ['Total', '', '', '', $data->sum('total_amount'), ''], currencyCols: [5]);
+        }
+
+        ExcelStyler::setColumnWidths($sheet, [16, 16, 24, 12, 16, 30]);
+
+        return ExcelStyler::download($spreadsheet, "laporan-retur-pembelian-{$start}_sd_{$end}.xlsx");
+    }
+
     /**
      * Bangun sheet utama untuk laporan AP/AR — bentuknya sama persis, cuma beda label & key.
      */

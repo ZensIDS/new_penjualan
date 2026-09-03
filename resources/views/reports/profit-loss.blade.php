@@ -24,7 +24,9 @@
                     <span class="tnum">Rp {{ number_format($data['revenue_gross'], 0, ',', '.') }}</span>
                 </div>
                 <div class="flex items-center justify-between px-6 py-3.5">
-                    <span class="text-ink/60">Retur Penjualan (SO)</span>
+                    <span class="text-ink/60">
+                        <a href="{{ route('reports.sales-return', ['start_date' => $startDate, 'end_date' => $endDate]) }}" class="hover:text-amber-700 underline decoration-dotted underline-offset-2">Retur Penjualan (SO)</a>
+                    </span>
                     <span class="tnum text-red-700">- Rp {{ number_format($data['sales_return'], 0, ',', '.') }}</span>
                 </div>
                 <div class="px-6 py-3.5 font-medium bg-ink/[0.02]">
@@ -98,9 +100,21 @@
 
         {{-- Retur SO & PO periode ini --}}
         <div class="lg:col-span-3 rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
-            <div class="px-6 py-4 border-b border-ink/10">
-                <h2 class="font-display font-semibold">Pembelian &amp; Retur SO / PO</h2>
-                <p class="text-xs text-ink/40 mt-0.5">Nilai pada periode yang dipilih (berdasar tanggal transaksi / tanggal retur)</p>
+            <div class="px-6 py-4 border-b border-ink/10 flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                    <h2 class="font-display font-semibold">Pembelian &amp; Retur SO / PO</h2>
+                    <p class="text-xs text-ink/40 mt-0.5">Nilai pada periode yang dipilih (berdasar tanggal transaksi / tanggal retur)</p>
+                </div>
+                <div class="flex items-center gap-2 text-xs">
+                    <a href="{{ route('reports.sales-return', ['start_date' => $startDate, 'end_date' => $endDate]) }}"
+                       class="rounded-full border border-red-600/20 bg-red-50 text-red-700 font-medium px-3 py-1.5 hover:bg-red-100 transition-colors">
+                        Detail Retur Penjualan &rarr;
+                    </a>
+                    <a href="{{ route('reports.purchase-return', ['start_date' => $startDate, 'end_date' => $endDate]) }}"
+                       class="rounded-full border border-amber-600/20 bg-amber-50 text-amber-700 font-medium px-3 py-1.5 hover:bg-amber-100 transition-colors">
+                        Detail Retur Pembelian &rarr;
+                    </a>
+                </div>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-ink/[0.06] text-sm">
                 <div class="px-6 py-4">
