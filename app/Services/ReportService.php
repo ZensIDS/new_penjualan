@@ -638,4 +638,82 @@ class ReportService
             ]),
         ];
     }
+
+    /**
+     * Laporan Pengeluaran: tampil per item (satu baris = satu transaksi
+     * biaya) berdasar expense_date, dengan filter kategori & rentang
+     * tanggal. Dipaginasi di server, sama seperti laporan lain.
+     */
+    public function expenseReportPaginated(string $startDate, string $endDate, ?int $categoryId = null, ?string $search = null, int $perPage = 25)
+    {
+        $paginator = $this->expenseQuery($startDate, $endDate, $categoryId, $search)
+            ->orderByDesc('expense_date')->orderByDesc('id')
+            ->paginate($perPage)->withQueryString();
+
+        $paginator->setCollection(
+            $paginator->getCollection()->map(fn(Expense $e) => $this->mapExpense($e))
+        );
+
+        return $paginator;
+    }
+
+    /**
+     * Sama seperti expenseReportPaginated(), tapi ambil SEMUA baris
+     * sekaligus (tanpa pagination) — khusus dipakai untuk export Excel.
+     */
+    public function expenseReport(string $startDate, string $endDate, ?int $categoryId = null, ?string $search = null)
+    {
+        return $this->expenseQuery($startDate, $endDate, $categoryId, $search)
+            ->orderByDesc('expense_date')->orderByDesc('id')
+            ->get()
+            ->map(fn(Expense $e) => $this->mapExpense($e));
+    }
+
+    private function expenseQuery(string $startDate, string $endDate, ?int $categoryId = null, ?string $search = null)
+    {
+        $query = Expense::with('category')->whereBetween('expense_date', [$startDate, $endDate]);
+
+        if (filled($categoryId)) {
+            $query->where('expense_category_id', $categoryId);
+        }
+
+        if (filled($search)) {
+            $query->where('description', 'like', '%' . $search . '%');
+        }
+
+        return $query;
+    }
+
+    /**
+     * KPI pengeluaran (jumlah transaksi, total, rata-rata) dihitung via
+     * agregasi SQL atas SELURUH baris pada filter yang sama (kategori +
+     * rentang tanggal), independen dari pagination/pencarian deskripsi.
+     */
+    public function expenseReportKpis(string $startDate, string $endDate, ?int $categoryId = null): array
+    {
+        $base = Expense::whereBetween('expense_date', [$startDate, $endDate]);
+
+        if (filled($categoryId)) {
+            $base->where('expense_category_id', $categoryId);
+        }
+
+        $count = (clone $base)->count();
+        $total = (float) (clone $base)->sum('amount');
+
+        return [
+            'count'   => $count,
+            'total'   => $total,
+            'average' => $count > 0 ? $total / $count : 0.0,
+        ];
+    }
+
+    private function mapExpense(Expense $e): array
+    {
+        return [
+            'expense_date' => $e->expense_date->format('Y-m-d'),
+            'category'     => $e->category->name ?? '—',
+            'description'  => $e->description,
+            'amount'       => (float) $e->amount,
+        ];
+    }
 }

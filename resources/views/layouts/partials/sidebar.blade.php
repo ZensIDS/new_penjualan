@@ -28,6 +28,7 @@
             ['label' => 'Piutang (AR)', 'route' => 'reports.receivable', 'pattern' => 'reports.receivable'],
             ['label' => 'Retur Penjualan (SO)', 'route' => 'reports.sales-return', 'pattern' => 'reports.sales-return'],
             ['label' => 'Retur Pembelian (PO)', 'route' => 'reports.purchase-return', 'pattern' => 'reports.purchase-return'],
+            ['label' => 'Pengeluaran', 'route' => 'reports.expenses', 'pattern' => 'reports.expenses'],
         ],
     ];
 @endphp

@@ -78,6 +78,7 @@ Route::middleware('auth')->group(function () {
         Route::get('receivable', [ReportController::class, 'receivable'])->name('receivable');
         Route::get('sales-return', [ReportController::class, 'salesReturn'])->name('sales-return');
         Route::get('purchase-return', [ReportController::class, 'purchaseReturn'])->name('purchase-return');
+        Route::get('expenses', [ReportController::class, 'expenses'])->name('expenses');
 
         Route::prefix('export')->name('export.')->group(function () {
             Route::get('stock', [ReportExportController::class, 'stock'])->name('stock');
@@ -87,6 +88,7 @@ Route::middleware('auth')->group(function () {
             Route::get('receivable', [ReportExportController::class, 'receivable'])->name('receivable');
             Route::get('sales-return', [ReportExportController::class, 'salesReturn'])->name('sales-return');
             Route::get('purchase-return', [ReportExportController::class, 'purchaseReturn'])->name('purchase-return');
+            Route::get('expenses', [ReportExportController::class, 'expenses'])->name('expenses');
         });
     });
 });

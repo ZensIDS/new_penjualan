@@ -47,9 +47,21 @@
                     <span>Laba Kotor</span>
                     <span class="tnum">Rp {{ number_format($data['gross_profit'], 0, ',', '.') }}</span>
                 </div>
-                <div class="flex items-center justify-between px-6 py-3.5">
-                    <span class="text-ink/60">Biaya Operasional</span>
-                    <span class="tnum text-red-700">- Rp {{ number_format($data['operational_expense'], 0, ',', '.') }}</span>
+                <div class="px-6 py-3.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-ink/60">Biaya Operasional</span>
+                        <span class="tnum text-red-700">- Rp {{ number_format($data['operational_expense'], 0, ',', '.') }}</span>
+                    </div>
+                    @if ($data['expense_by_category']->isNotEmpty())
+                        <div class="mt-2 space-y-1 pl-3 border-l-2 border-ink/10">
+                            @foreach ($data['expense_by_category'] as $row)
+                                <div class="flex items-center justify-between text-xs text-ink/40">
+                                    <span>{{ $row->name }}</span>
+                                    <span class="tnum">Rp {{ number_format($row->total, 0, ',', '.') }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
                 <div class="flex items-center justify-between px-6 py-3.5 font-semibold bg-amber-50/60">
                     <span>Laba Bersih</span>

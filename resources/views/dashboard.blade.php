@@ -142,9 +142,21 @@
                     <span>Laba Kotor</span>
                     <span class="tnum">Rp {{ number_format($profitLoss['gross_profit'], 0, ',', '.') }}</span>
                 </div>
-                <div class="flex items-center justify-between px-6 py-3.5">
-                    <span class="text-ink/60">Biaya Operasional</span>
-                    <span class="tnum text-red-700">- Rp {{ number_format($profitLoss['operational_expense'], 0, ',', '.') }}</span>
+                <div class="px-6 py-3.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-ink/60">Biaya Operasional</span>
+                        <span class="tnum text-red-700">- Rp {{ number_format($profitLoss['operational_expense'], 0, ',', '.') }}</span>
+                    </div>
+                    @if ($profitLoss['expense_by_category']->isNotEmpty())
+                        <div class="mt-2 space-y-1 pl-3 border-l-2 border-ink/10">
+                            @foreach ($profitLoss['expense_by_category'] as $row)
+                                <div class="flex items-center justify-between text-xs text-ink/40">
+                                    <span>{{ $row->name }}</span>
+                                    <span class="tnum">Rp {{ number_format($row->total, 0, ',', '.') }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
                 <div class="flex items-center justify-between px-6 py-3.5 font-semibold bg-amber-50/60">
                     <span>Laba Bersih</span>
@@ -172,14 +184,14 @@
             <div class="divide-y divide-ink/[0.06] text-sm flex-1">
                 <div class="flex items-center justify-between px-6 py-3">
                     <span class="text-ink/60 flex items-center gap-1.5">
-                        <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                        <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
                         Kas Masuk
                     </span>
                     <span class="tnum text-emerald-700">Rp {{ number_format($cashFlow['total_in'], 0, ',', '.') }}</span>
                 </div>
                 <div class="flex items-center justify-between px-6 py-3">
                     <span class="text-ink/60 flex items-center gap-1.5">
-                        <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 text-red-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+                        <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 text-red-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
                         Kas Keluar
                     </span>
                     <span class="tnum text-red-700">Rp {{ number_format($cashFlow['total_out'], 0, ',', '.') }}</span>

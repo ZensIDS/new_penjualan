@@ -19,7 +19,7 @@ class ReportController extends Controller
     {
         $search = $request->input('search');
 
-        $data = $this->reportService->stockReportPaginated($search, 25);
+        $data = $this->reportService->stockReportPaginated($search, 10);
         $kpis = $this->reportService->stockKpis();
         $byCategory = $this->reportService->stockValueByCategory();
 
@@ -45,7 +45,7 @@ class ReportController extends Controller
 
         $data = $this->reportService->cashFlowReport($start, $end);
 
-        // Tabel "Rincian Transaksi" dipaginasi terpisah (25/halaman) supaya
+        // Tabel "Rincian Transaksi" dipaginasi terpisah (10/halaman) supaya
         // tidak nge-render seluruh transaksi kas dalam rentang tanggal
         // sekaligus. KPI & grafik di atas tetap pakai $data (agregat semua
         // baris pada rentang tanggal terpilih).
@@ -88,7 +88,7 @@ class ReportController extends Controller
         [$start, $end] = $this->resolveRange($request);
         $search = $request->input('search');
 
-        $data = $this->reportService->salesReturnReportPaginated($start, $end, $search, 25);
+        $data = $this->reportService->salesReturnReportPaginated($start, $end, $search, 10);
         $kpis = $this->reportService->salesReturnKpis($start, $end);
 
         return view('reports.sales-return', [
@@ -114,6 +114,27 @@ class ReportController extends Controller
             'search'    => $search,
             'startDate' => $start,
             'endDate'   => $end,
+        ]);
+    }
+
+    public function expenses(Request $request)
+    {
+        [$start, $end] = $this->resolveRange($request);
+        $search = $request->input('search');
+        $categoryId = $request->filled('category_id') ? (int) $request->input('category_id') : null;
+
+        $data = $this->reportService->expenseReportPaginated($start, $end, $categoryId, $search, 10);
+        $kpis = $this->reportService->expenseReportKpis($start, $end, $categoryId);
+        $categories = \App\Models\ExpenseCategory::orderBy('name')->get(['id', 'name']);
+
+        return view('reports.expenses', [
+            'data'       => $data,
+            'kpis'       => $kpis,
+            'categories' => $categories,
+            'categoryId' => $categoryId,
+            'search'     => $search,
+            'startDate'  => $start,
+            'endDate'    => $end,
         ]);
     }
 
