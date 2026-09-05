@@ -143,13 +143,21 @@ class PurchaseOrderService
     /**
      * Update PO yang sudah ada: ganti data utama + replace semua item lama
      * dengan item baru (batch stok lama dihapus, batch baru dibuat).
-     * HANYA boleh dipanggil selagi PO belum dibayar sama sekali dan
-     * belum ada barangnya yang terlanjur terjual.
+     * Tetap boleh dipanggil meskipun PO sudah ada pembayaran (partial/lunas) —
+     * yang HANYA memblokir adalah kalau ada barang dari PO ini yang sudah
+     * terlanjur terjual (batch stok sudah kepakai).
+     *
+     * Karena total PO bisa berubah sementara paid_amount tidak (pembayaran
+     * lama tidak ikut diubah di sini), payment_status dihitung ulang dari
+     * total baru vs paid_amount yang sudah ada. Kalau total baru justru
+     * lebih kecil dari yang sudah dibayar, ditolak — user harus koreksi/
+     * hapus pembayaran dulu supaya tidak terjadi kondisi "kelebihan bayar".
      *
      * @param array $data ['supplier_id', 'po_date', 'note']
      * @param array $items [['product_id', 'qty', 'buy_price'], ...]
      *
-     * @throws \RuntimeException kalau PO sudah dibayar atau ada batch yang sudah kepakai
+     * @throws \RuntimeException kalau ada batch yang sudah kepakai, atau
+     *                            total baru lebih kecil dari paid_amount
      */
     public function update(PurchaseOrder $po, array $data, array $items): PurchaseOrder
     {
@@ -168,11 +176,18 @@ class PurchaseOrderService
                 $totalAmount += $item['qty'] * $item['buy_price'];
             }
 
+            if ($totalAmount < (float) $po->paid_amount) {
+                throw new \RuntimeException(
+                    "Total PO baru (Rp {$totalAmount}) lebih kecil dari total yang sudah dibayar (Rp {$po->paid_amount}) untuk PO #{$po->po_number}. Koreksi/kurangi pembayaran dulu sebelum mengubah item PO ini."
+                );
+            }
+
             $po->update([
-                'supplier_id'  => $data['supplier_id'],
-                'po_date'      => $data['po_date'],
-                'note'         => $data['note'] ?? null,
-                'total_amount' => $totalAmount,
+                'supplier_id'    => $data['supplier_id'],
+                'po_date'        => $data['po_date'],
+                'note'           => $data['note'] ?? null,
+                'total_amount'   => $totalAmount,
+                'payment_status' => $this->resolvePaymentStatus($totalAmount, (float) $po->paid_amount),
             ]);
 
             foreach ($items as $item) {
@@ -191,15 +206,22 @@ class PurchaseOrderService
     }
 
     /**
-     * Hapus PO beserta item & batch stoknya. HANYA boleh dipanggil selagi
-     * PO belum dibayar sama sekali dan belum ada barangnya yang terjual.
+     * Hapus PO beserta item & batch stoknya — tetap boleh dipanggil meskipun
+     * PO sudah ada pembayaran (partial/lunas). Karena PO dihapus total,
+     * semua pembayaran yang sudah tercatat ikut dihapus (cascadeOnDelete di
+     * migration purchase_payments), dan SEBELUM itu entry cash_flow milik
+     * pembayaran-pembayaran tersebut dihapus juga di sini — supaya ledger
+     * arus kas tidak menyisakan "kas keluar" untuk PO yang sudah tidak ada.
      *
-     * @throws \RuntimeException kalau PO sudah dibayar atau ada batch yang sudah kepakai
+     * Satu-satunya hal yang tetap memblokir hapus adalah kalau ada barang
+     * dari PO ini yang sudah terlanjur terjual (batch stok sudah kepakai).
+     *
+     * @throws \RuntimeException kalau ada batch yang sudah kepakai
      */
     public function delete(PurchaseOrder $po): void
     {
         DB::transaction(function () use ($po) {
-            $po->loadMissing('items.stockBatch');
+            $po->loadMissing('items.stockBatch', 'payments');
 
             $this->guardCanModify($po);
 
@@ -207,23 +229,24 @@ class PurchaseOrderService
                 $this->stockService->removeUnusedPurchaseBatch($item);
             }
 
-            // items ikut terhapus otomatis (cascadeOnDelete di migration purchase_order_items)
+            foreach ($po->payments as $payment) {
+                $this->cashFlowService->deleteForSource($payment);
+            }
+
+            // items & payments ikut terhapus otomatis (cascadeOnDelete di migration)
             $po->delete();
         });
     }
 
     /**
-     * Pastikan PO boleh diedit/dihapus: belum dibayar sama sekali, DAN
-     * semua barangnya belum ada yang terjual (batch masih utuh).
+     * Pastikan PO boleh diedit/dihapus. Status pembayaran TIDAK lagi jadi
+     * penghalang (lihat PurchaseOrder::canBeModified) — satu-satunya syarat
+     * adalah semua barangnya belum ada yang terjual (batch masih utuh),
+     * karena kalau sudah terjual, mengubah/menghapus PO akan merusak
+     * catatan HPP/penjualan yang sudah terlanjur jalan.
      */
     protected function guardCanModify(PurchaseOrder $po): void
     {
-        if (! $po->canBeModified()) {
-            throw new \RuntimeException(
-                "PO #{$po->po_number} sudah ada pembayaran, tidak bisa diedit/dihapus lagi."
-            );
-        }
-
         foreach ($po->items as $item) {
             if ($this->stockService->isPurchaseItemBatchUsed($item)) {
                 throw new \RuntimeException(

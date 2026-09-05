@@ -73,12 +73,10 @@ class SalesOrderController extends Controller
 
     public function edit(SalesOrder $salesOrder)
     {
-        if (! $salesOrder->canBeModified()) {
-            return redirect()
-                ->route('sales-orders.show', $salesOrder)
-                ->with('error', 'Transaksi ini sudah ada pembayaran, tidak bisa diedit lagi.');
-        }
-
+        // Edit tetap boleh diakses meskipun SO sudah ada pembayaran (partial/lunas).
+        // Satu-satunya hal yang benar-benar memblokir adalah kalau ada item dari
+        // SO ini yang sudah pernah diretur customer — itu baru ketahuan saat
+        // submit (lihat SalesOrderService::guardCanModify), errornya ditangkap di update().
         $salesOrder->load('items');
 
         $customers = Customer::orderBy('name')->get(['id', 'name']);
@@ -121,10 +119,9 @@ class SalesOrderController extends Controller
 
     public function destroy(SalesOrder $salesOrder)
     {
-        if (! $salesOrder->canBeModified()) {
-            return back()->withErrors(['error' => 'Transaksi ini sudah ada pembayaran, tidak bisa dihapus lagi.']);
-        }
-
+        // Hapus tetap boleh meskipun SO sudah ada pembayaran (partial/lunas) —
+        // pembayaran & entry cashflow-nya ikut dibersihkan di service. Satu-
+        // satunya hal yang memblokir adalah kalau itemnya sudah diretur customer.
         try {
             $soNumber = $salesOrder->so_number;
             $this->service->delete($salesOrder);

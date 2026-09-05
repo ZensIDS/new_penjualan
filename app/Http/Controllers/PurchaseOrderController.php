@@ -47,15 +47,10 @@ class PurchaseOrderController extends Controller
 
     public function edit(PurchaseOrder $purchaseOrder)
     {
-        // Halaman edit tidak boleh diakses sama sekali kalau PO sudah ada
-        // pembayaran — redirect balik ke detail dengan pesan, bukan 403 mentah,
-        // supaya user tahu kenapa.
-        if (! $purchaseOrder->canBeModified()) {
-            return redirect()
-                ->route('purchase-orders.show', $purchaseOrder)
-                ->with('error', 'PO ini sudah ada pembayaran, tidak bisa diedit lagi.');
-        }
-
+        // Edit tetap boleh diakses meskipun PO sudah ada pembayaran (partial/lunas).
+        // Satu-satunya hal yang benar-benar memblokir adalah kalau barang dari PO
+        // ini sudah terlanjur terjual — itu baru ketahuan saat submit (lihat
+        // PurchaseOrderService::guardCanModify), dan errornya ditangkap di update().
         $purchaseOrder->load('items');
 
         $suppliers = Supplier::orderBy('name')->get(['id', 'name']);
@@ -92,10 +87,9 @@ class PurchaseOrderController extends Controller
 
     public function destroy(PurchaseOrder $purchaseOrder)
     {
-        if (! $purchaseOrder->canBeModified()) {
-            return back()->withErrors(['error' => 'PO ini sudah ada pembayaran, tidak bisa dihapus lagi.']);
-        }
-
+        // Hapus tetap boleh meskipun PO sudah ada pembayaran (partial/lunas) —
+        // pembayaran & entry cashflow-nya ikut dibersihkan di service. Satu-
+        // satunya hal yang memblokir adalah kalau barangnya sudah terjual.
         try {
             $poNumber = $purchaseOrder->po_number;
             $this->service->delete($purchaseOrder);

@@ -45,4 +45,17 @@ class CashFlowService
                 'amount'           => $amount,
             ]);
     }
+
+    /**
+     * Hapus semua entry cash_flow milik satu source (mis. PurchasePayment) —
+     * dipakai saat PO/SO dihapus padahal sudah punya pembayaran, supaya
+     * ledger arus kas tidak menyisakan entry "hantu" untuk transaksi yang
+     * sumbernya sudah tidak ada.
+     */
+    public function deleteForSource(Model $source): void
+    {
+        CashFlow::where('source_type', get_class($source))
+            ->where('source_id', $source->getKey())
+            ->delete();
+    }
 }

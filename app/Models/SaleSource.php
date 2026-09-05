@@ -13,6 +13,6 @@ class SaleSource extends Model
 
     public function salesOrders()
     {
-        return $this->hasMany(SalesOrder::class);
+        return $this->hasMany(SalesOrder::class, 'source_id');
     }
 }

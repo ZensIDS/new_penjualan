@@ -45,10 +45,14 @@ class PurchaseOrder extends Model
         return (float) $this->total_amount - (float) $this->paid_amount;
     }
 
-    // Edit & hapus PO hanya boleh selama belum ada pembayaran sama sekali.
-    // Begitu ada pembayaran (sekecil apa pun), PO dianggap final.
+    // Kebijakan: edit & hapus PO TETAP diperbolehkan meskipun sudah ada
+    // pembayaran (partial maupun lunas). Satu-satunya hal yang benar-benar
+    // memblokir edit/hapus adalah kalau stok dari PO ini sudah terlanjur
+    // terjual (lihat PurchaseOrderService::guardCanModify) — itu dicek
+    // terpisah di service karena butuh query ke tabel lain, bukan lewat
+    // method ini.
     public function canBeModified(): bool
     {
-        return $this->payment_status === 'unpaid' && (float) $this->paid_amount <= 0;
+        return true;
     }
 }

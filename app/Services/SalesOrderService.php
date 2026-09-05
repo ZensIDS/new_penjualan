@@ -160,13 +160,22 @@ class SalesOrderService
     /**
      * Update SO yang sudah ada: ganti data utama + replace semua item lama
      * dengan item baru. Alokasi FIFO lama dikembalikan ke batch asal dulu,
-     * baru item baru dialokasikan ulang. HANYA boleh dipanggil selagi SO
-     * belum dibayar sama sekali.
+     * baru item baru dialokasikan ulang. Tetap boleh dipanggil meskipun SO
+     * sudah ada pembayaran (partial/lunas) — yang HANYA memblokir adalah
+     * kalau ada item dari SO ini yang sudah terlanjur diretur customer.
+     *
+     * Karena total SO bisa berubah sementara paid_amount tidak (pembayaran
+     * lama tidak ikut diubah di sini), payment_status dihitung ulang dari
+     * total baru vs paid_amount yang sudah ada. Kalau total baru justru
+     * lebih kecil dari yang sudah dibayar, ditolak — user harus koreksi/
+     * hapus pembayaran dulu supaya tidak terjadi kondisi "kelebihan bayar".
      *
      * @param array $data ['customer_id', 'so_date', 'note', 'source_id']
      * @param array $items [['product_id', 'qty', 'sell_price'], ...]
      *
-     * @throws \RuntimeException kalau SO sudah dibayar, atau stok tidak cukup untuk item baru
+     * @throws \RuntimeException kalau ada item yang sudah diretur, stok tidak
+     *                            cukup untuk item baru, atau total baru lebih
+     *                            kecil dari paid_amount
      */
     public function update(SalesOrder $so, array $data, array $items): SalesOrder
     {
@@ -174,6 +183,17 @@ class SalesOrderService
             $so->loadMissing('items.allocations');
 
             $this->guardCanModify($so);
+
+            $totalAmount = 0;
+            foreach ($items as $item) {
+                $totalAmount += $item['qty'] * $item['sell_price'];
+            }
+
+            if ($totalAmount < (float) $so->paid_amount) {
+                throw new \RuntimeException(
+                    "Total transaksi baru (Rp {$totalAmount}) lebih kecil dari total yang sudah dibayar (Rp {$so->paid_amount}) untuk SO #{$so->so_number}. Koreksi/kurangi pembayaran dulu sebelum mengubah item transaksi ini."
+                );
+            }
 
             foreach ($so->items as $saleItem) {
                 $this->stockService->reverseAllocations(
@@ -184,18 +204,14 @@ class SalesOrderService
                 $saleItem->delete(); // allocations ikut terhapus (cascadeOnDelete)
             }
 
-            $totalAmount = 0;
-            foreach ($items as $item) {
-                $totalAmount += $item['qty'] * $item['sell_price'];
-            }
-
             $so->update([
-                'customer_id'  => $data['customer_id'],
-                'so_date'      => $data['so_date'],
-                'note'         => $data['note'] ?? null,
-                'source_id'    => $data['source_id'] ?? $so->source_id,
-                'total_amount' => $totalAmount,
-                'total_hpp'    => 0,
+                'customer_id'    => $data['customer_id'],
+                'so_date'        => $data['so_date'],
+                'note'           => $data['note'] ?? null,
+                'source_id'      => $data['source_id'] ?? $so->source_id,
+                'total_amount'   => $totalAmount,
+                'total_hpp'      => 0,
+                'payment_status' => $this->resolvePaymentStatus($totalAmount, (float) $so->paid_amount),
             ]);
 
             $totalHpp = 0;
@@ -235,16 +251,19 @@ class SalesOrderService
     }
 
     /**
-     * Hapus SO: kembalikan semua alokasi FIFO ke batch asal, lalu hapus SO
-     * (item & pembayaran ikut terhapus lewat cascade). HANYA boleh dipanggil
-     * selagi SO belum dibayar sama sekali.
+     * Hapus SO: kembalikan semua alokasi FIFO ke batch asal, hapus entry
+     * cashflow dari semua pembayaran yang sudah tercatat, lalu hapus SO
+     * (item & pembayaran ikut terhapus lewat cascade). Tetap boleh dipanggil
+     * meskipun SO sudah ada pembayaran (partial/lunas) — yang HANYA
+     * memblokir adalah kalau ada item dari SO ini yang sudah terlanjur
+     * diretur customer.
      *
-     * @throws \RuntimeException kalau SO sudah dibayar
+     * @throws \RuntimeException kalau ada item yang sudah diretur
      */
     public function delete(SalesOrder $so): void
     {
         DB::transaction(function () use ($so) {
-            $so->loadMissing('items.allocations');
+            $so->loadMissing('items.allocations', 'payments');
 
             $this->guardCanModify($so);
 
@@ -256,17 +275,31 @@ class SalesOrderService
                 );
             }
 
+            foreach ($so->payments as $payment) {
+                $this->cashFlowService->deleteForSource($payment);
+            }
+
             // items & payments ikut terhapus otomatis (cascadeOnDelete di migration)
             $so->delete();
         });
     }
 
+    /**
+     * Pastikan SO boleh diedit/dihapus. Status pembayaran TIDAK lagi jadi
+     * penghalang (lihat SalesOrder::canBeModified) — satu-satunya syarat
+     * adalah belum ada item dari SO ini yang diretur customer, karena kalau
+     * sudah diretur, mengubah/menghapus SO akan merusak catatan retur yang
+     * sudah terlanjur jalan (retur mengacu ke baris item & alokasi FIFO
+     * milik SO ini).
+     */
     protected function guardCanModify(SalesOrder $so): void
     {
-        if (! $so->canBeModified()) {
-            throw new \RuntimeException(
-                "Transaksi #{$so->so_number} sudah ada pembayaran, tidak bisa diedit/dihapus lagi."
-            );
+        foreach ($so->items as $saleItem) {
+            if ($saleItem->qty_returned > 0) {
+                throw new \RuntimeException(
+                    "Transaksi #{$so->so_number} tidak bisa diedit/dihapus karena barang \"{$saleItem->product->name}\" dari transaksi ini sudah pernah diretur customer."
+                );
+            }
         }
     }
 
