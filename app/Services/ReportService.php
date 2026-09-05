@@ -465,7 +465,7 @@ class ReportService
     {
         return [
             'so_number'         => $so->so_number,
-            'customer'          => $so->customer->name,
+            'customer'          => $so->customer->name ?? 'Customer umum',
             'so_date'           => $so->so_date->format('Y-m-d'),
             'total_amount'      => (float) $so->total_amount,
             'paid_amount'       => (float) $so->paid_amount,

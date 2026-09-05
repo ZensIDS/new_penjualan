@@ -34,7 +34,7 @@
                 </span>
             </div>
             <p class="text-sm text-ink/50">
-                {{ $salesOrder->so_date->translatedFormat('d F Y') }} &middot; {{ $salesOrder->customer->name }}
+                {{ $salesOrder->so_date->translatedFormat('d F Y') }} &middot; {{ $salesOrder->customer->name ?? 'Customer umum' }}
             </p>
         </div>
 

@@ -162,7 +162,7 @@ class SalesReturnService
                     $data['return_date'],
                     $overpaid,
                     $return,
-                    "Refund retur {$return->return_number} — SO #{$so->so_number} ke {$so->customer->name}"
+                    "Refund retur {$return->return_number} — SO #{$so->so_number} ke " . ($so->customer->name ?? 'Customer umum')
                 );
             }
 

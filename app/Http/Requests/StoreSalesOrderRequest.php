@@ -15,7 +15,7 @@ class StoreSalesOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'customer_id'   => ['required', 'exists:customers,id'],
+            'customer_id'   => ['nullable', 'exists:customers,id'],
             'so_date'       => ['required', 'date'],
             'note'          => ['nullable', 'string', 'max:1000'],
             'source_id'     => ['required', 'exists:sale_sources,id'],

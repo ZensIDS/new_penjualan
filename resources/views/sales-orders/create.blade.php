@@ -19,6 +19,7 @@
         </a>
         <h2 class="text-2xl font-display font-semibold tracking-tight">Buat Transaksi Penjualan</h2>
         <p class="text-sm text-ink/50 mt-1">Stok akan otomatis dipotong FIFO (batch tertua duluan) begitu transaksi disimpan.</p>
+        <p class="text-xs text-ink/40 mt-1">Kolom bertanda <span class="text-red-600 font-medium">*</span> wajib diisi.</p>
     </div>
 
     <form method="POST" action="{{ route('sales-orders.store') }}" @submit="onSubmit">
@@ -28,7 +29,7 @@
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6 mb-6">
             <div class="grid grid-cols-1 @4xl:grid-cols-2 gap-4">
                 <div>
-                    <div class="flex items-center justify-between mb-1.5">
+                    <div class="flex items-center gap-2 mb-1.5">
                         <label class="block text-sm font-medium">Customer</label>
                         <button type="button" @click="openCustomerModal()"
                                 class="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800">
@@ -38,7 +39,7 @@
                     </div>
                     <div class="relative">
                         <select x-ref="customerSelect" name="customer_id" x-init="initCustomerSelect($el)">
-                            <option value="">— Pilih customer —</option>
+                            <option value="">— Pilih customer (opsional) —</option>
                             <template x-for="c in customers" :key="c.id">
                                 <option :value="c.id" x-text="c.name"></option>
                             </template>
@@ -48,7 +49,7 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium mb-1.5">Tanggal Transaksi</label>
+                    <label class="block text-sm font-medium mb-1.5">Tanggal Transaksi <span class="text-red-600">*</span></label>
                     <input type="date" name="so_date" value="{{ old('so_date', now()->toDateString()) }}"
                            class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
                     @error('so_date')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
@@ -64,8 +65,8 @@
                 </div>
 
                 <div>
-                    <div class="flex items-center justify-between mb-1.5">
-                        <label class="block text-sm font-medium">Asal Penjualan</label>
+                    <div class="flex items-center gap-2 mb-1.5">
+                        <label class="block text-sm font-medium">Asal Penjualan <span class="text-red-600">*</span></label>
                         <button type="button" @click="openSourceModal()"
                                 class="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800">
                             <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -85,8 +86,8 @@
 
         {{-- Item barang --}}
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden mb-6">
-            <div class="px-6 py-4 border-b border-ink/10 flex items-center justify-between">
-                <h3 class="font-display font-semibold">Item Barang</h3>
+            <div class="px-6 py-4 border-b border-ink/10 flex items-center gap-2">
+                <h3 class="font-display font-semibold">Item Barang <span class="text-red-600">*</span></h3>
                 <button type="button" @click="addItem()"
                         class="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 hover:text-amber-800">
                     <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -98,7 +99,7 @@
                 <template x-for="(item, index) in items" :key="item.key">
                     <div class="p-5 grid grid-cols-1 @4xl:grid-cols-12 gap-3 sm:items-start">
                         <div class="@4xl:col-span-5">
-                            <label class="block text-xs font-medium text-ink/50 mb-1.5" x-show="index === 0">Produk</label>
+                            <label class="block text-xs font-medium text-ink/50 mb-1.5" x-show="index === 0">Produk <span class="text-red-600">*</span></label>
                             <div class="relative">
                                 <select :name="'items['+index+'][product_id]'" x-init="initProductSelect($el, item)"></select>
                             </div>
@@ -110,7 +111,7 @@
                         </div>
 
                         <div class="@4xl:col-span-2">
-                            <label class="block text-xs font-medium text-ink/50 mb-1.5" x-show="index === 0">Qty</label>
+                            <label class="block text-xs font-medium text-ink/50 mb-1.5" x-show="index === 0">Qty <span class="text-red-600">*</span></label>
                             <input type="number" min="1" :name="'items['+index+'][qty]'" x-model.number="item.qty"
                                    class="w-full rounded-xl border px-3.5 py-2.5 text-sm tnum focus:outline-none focus:ring-4 transition-shadow"
                                    :class="exceedsStock(item)
@@ -119,7 +120,7 @@
                         </div>
 
                         <div class="@4xl:col-span-3">
-                            <label class="block text-xs font-medium text-ink/50 mb-1.5" x-show="index === 0">Harga Jual / Unit</label>
+                            <label class="block text-xs font-medium text-ink/50 mb-1.5" x-show="index === 0">Harga Jual / Unit <span class="text-red-600">*</span></label>
                             <div class="relative">
                                 <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-ink/40">Rp</span>
                                 <input type="text" inputmode="numeric"
@@ -225,10 +226,12 @@
                     <h2 class="font-display font-semibold text-lg">Tambah Customer Baru</h2>
                 </div>
 
+                <p class="text-xs text-ink/40 -mt-2 mb-4">Kolom bertanda <span class="text-red-600 font-medium">*</span> wajib diisi, sisanya boleh dikosongkan.</p>
+
                 <form @submit.prevent="submitCustomer()">
                     <div class="space-y-4">
                         <div>
-                            <label class="block text-sm font-medium mb-1.5">Nama</label>
+                            <label class="block text-sm font-medium mb-1.5">Nama <span class="text-red-600">*</span></label>
                             <input type="text" x-model="customerForm.name" x-ref="customerNameInput"
                                    class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
                             <p class="text-xs text-red-600 mt-1" x-text="customerErrors.name?.[0]"></p>
@@ -236,21 +239,21 @@
 
                         <div>
                             <label class="block text-sm font-medium mb-1.5">Telepon</label>
-                            <input type="text" x-model="customerForm.phone"
+                            <input type="text" x-model="customerForm.phone" placeholder="Opsional"
                                    class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
                             <p class="text-xs text-red-600 mt-1" x-text="customerErrors.phone?.[0]"></p>
                         </div>
 
                         <div>
                             <label class="block text-sm font-medium mb-1.5">Email</label>
-                            <input type="email" x-model="customerForm.email"
+                            <input type="email" x-model="customerForm.email" placeholder="Opsional"
                                    class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
                             <p class="text-xs text-red-600 mt-1" x-text="customerErrors.email?.[0]"></p>
                         </div>
 
                         <div>
                             <label class="block text-sm font-medium mb-1.5">Alamat</label>
-                            <textarea x-model="customerForm.address" rows="3"
+                            <textarea x-model="customerForm.address" rows="3" placeholder="Opsional"
                                       class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow"></textarea>
                             <p class="text-xs text-red-600 mt-1" x-text="customerErrors.address?.[0]"></p>
                         </div>

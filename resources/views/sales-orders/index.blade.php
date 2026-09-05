@@ -40,7 +40,7 @@
                         <tr class="hover:bg-amber-50/40 transition-colors">
                             <td class="px-5 py-3.5 font-medium tnum">{{ $so->so_number }}</td>
                             <td class="px-5 py-3.5 text-ink/60 tnum">{{ $so->so_date->translatedFormat('d M Y') }}</td>
-                            <td class="px-5 py-3.5">{{ $so->customer->name }}</td>
+                            <td class="px-5 py-3.5">{{ $so->customer->name ?? 'Customer umum' }}</td>
                             <td class="px-5 py-3.5 text-right tnum">Rp {{ number_format($so->total_amount, 0, ',', '.') }}</td>
                             <td class="px-5 py-3.5 text-right tnum {{ $so->remaining_balance > 0 ? 'text-red-700 font-medium' : 'text-ink/40' }}">
                                 Rp {{ number_format($so->remaining_balance, 0, ',', '.') }}

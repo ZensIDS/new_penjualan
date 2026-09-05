@@ -108,7 +108,7 @@ class SalesOrderService
                 $date,
                 $amount,
                 $payment,
-                "Pembayaran SO #{$so->so_number} dari {$so->customer->name}"
+                "Pembayaran SO #{$so->so_number} dari " . ($so->customer->name ?? 'Customer umum')
             );
 
             return $payment;

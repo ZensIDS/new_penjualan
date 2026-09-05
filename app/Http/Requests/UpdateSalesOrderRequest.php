@@ -8,9 +8,9 @@ class UpdateSalesOrderRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Hanya superadmin, dan hanya kalau transaksi ini belum pernah dibayar
-        // sama sekali. Kalau sudah ada pembayaran, transaksi dianggap final —
-        // tolak di sini duluan (403) sebelum sempat masuk ke Service.
+        // Hanya superadmin. Status pembayaran (partial/lunas) TIDAK lagi membatasi
+        // — lihat SalesOrder::canBeModified(). Guard sebenarnya (item sudah diretur)
+        // dicek di SalesOrderService::guardCanModify() saat request ini diproses.
         return $this->user()->isSuperadmin()
             && $this->route('salesOrder')?->canBeModified();
     }
@@ -18,7 +18,7 @@ class UpdateSalesOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'customer_id'   => ['required', 'exists:customers,id'],
+            'customer_id'   => ['nullable', 'exists:customers,id'],
             'so_date'       => ['required', 'date'],
             'note'          => ['nullable', 'string', 'max:1000'],
             'source_id'     => ['required', 'exists:sale_sources,id'],
