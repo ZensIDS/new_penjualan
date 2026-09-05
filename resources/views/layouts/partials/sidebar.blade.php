@@ -14,7 +14,6 @@
         ],
         'Penjualan' => [
             ['label' => 'Sales Order', 'route' => 'sales-orders.index', 'pattern' => 'sales-orders.*'],
-            ['label' => 'Customer', 'route' => 'customers.index', 'pattern' => 'customers.*'],
             ['label' => 'Asal Penjualan', 'route' => 'sale-sources.index', 'pattern' => 'sale-sources.*'],
         ],
         'Operasional' => [
