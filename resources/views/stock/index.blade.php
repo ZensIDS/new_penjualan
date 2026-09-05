@@ -6,7 +6,7 @@
 <div>
 
     {{-- KPI: dihitung via agregasi SQL atas SELURUH data (tidak terpengaruh pagination/pencarian) --}}
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div class="grid grid-cols-1 @4xl:grid-cols-3 gap-4 mb-6">
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
             <p class="text-xs font-medium text-ink/50 mb-2 uppercase tracking-wide">Produk Terdaftar</p>
             <p class="font-display font-semibold text-2xl tnum">{{ number_format($kpis['product_count'], 0, ',', '.') }}</p>

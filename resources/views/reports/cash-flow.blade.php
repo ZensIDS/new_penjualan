@@ -8,7 +8,7 @@
     @include('reports.partials.date-filter', ['routeName' => 'reports.cash-flow', 'exportRouteName' => 'reports.export.cash-flow'])
 
     {{-- KPI --}}
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div class="grid grid-cols-1 @4xl:grid-cols-3 gap-4 mb-6">
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
             <p class="text-xs font-medium text-ink/50 mb-2 uppercase tracking-wide">Kas Masuk</p>
             <p class="font-display font-semibold text-2xl tnum text-emerald-700">
@@ -36,11 +36,13 @@
             <p class="text-xs text-ink/40 mt-0.5">Kas masuk vs. kas keluar per hari</p>
         </div>
         <div class="p-4">
-            @if ($data['daily']->isEmpty())
-                <p class="py-10 text-sm text-ink/40 text-center">Tidak ada transaksi kas pada periode ini.</p>
-            @else
-                <canvas id="cashFlowChart" height="90"></canvas>
-            @endif
+            <div class="relative h-56">
+                <canvas id="cashFlowChart"></canvas>
+                <div id="cashFlowChartEmpty" class="hidden absolute inset-0 flex flex-col items-center justify-center text-center gap-2 text-ink/40">
+                    <svg viewBox="0 0 24 24" class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg>
+                    <p class="text-xs">Tidak ada transaksi kas pada periode ini</p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -107,6 +109,16 @@
             return parts[2] + '/' + parts[1];
         });
 
+        const inData  = labels.map(d => daily[d].in);
+        const outData = labels.map(d => daily[d].out);
+        const hasAnyValue = (arr) => arr.some(v => Number(v) > 0);
+
+        if (!hasAnyValue(inData) && !hasAnyValue(outData)) {
+            el.classList.add('hidden');
+            document.getElementById('cashFlowChartEmpty').classList.remove('hidden');
+            return;
+        }
+
         new Chart(el, {
             type: 'bar',
             data: {
@@ -114,13 +126,13 @@
                 datasets: [
                     {
                         label: 'Kas Masuk',
-                        data: labels.map(d => daily[d].in),
+                        data: inData,
                         backgroundColor: '#10b981',
                         borderRadius: 4,
                     },
                     {
                         label: 'Kas Keluar',
-                        data: labels.map(d => daily[d].out),
+                        data: outData,
                         backgroundColor: '#ef4444',
                         borderRadius: 4,
                     },
@@ -128,6 +140,7 @@
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
                 plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
                 scales: {

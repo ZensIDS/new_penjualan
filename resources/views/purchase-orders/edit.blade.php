@@ -33,7 +33,7 @@
 
         {{-- Info utama --}}
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6 mb-6">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 @4xl:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium mb-1.5">Supplier</label>
                     <div class="relative">
@@ -76,8 +76,8 @@
 
             <div class="divide-y divide-ink/[0.06]">
                 <template x-for="(item, index) in items" :key="item.key">
-                    <div class="p-5 grid grid-cols-1 sm:grid-cols-12 gap-3 sm:items-start">
-                        <div class="sm:col-span-5">
+                    <div class="p-5 grid grid-cols-1 @4xl:grid-cols-12 gap-3 sm:items-start">
+                        <div class="@4xl:col-span-5">
                             <label class="block text-xs font-medium text-ink/50 mb-1.5" x-show="index === 0">Produk</label>
                             <div class="relative">
                                 <select :name="'items['+index+'][product_id]'" x-init="initProductSelect($el, item)">
@@ -92,13 +92,13 @@
                             </p>
                         </div>
 
-                        <div class="sm:col-span-2">
+                        <div class="@4xl:col-span-2">
                             <label class="block text-xs font-medium text-ink/50 mb-1.5" x-show="index === 0">Qty</label>
                             <input type="number" min="1" :name="'items['+index+'][qty]'" x-model.number="item.qty"
                                    class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm tnum focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
                         </div>
 
-                        <div class="sm:col-span-3">
+                        <div class="@4xl:col-span-3">
                             <label class="block text-xs font-medium text-ink/50 mb-1.5" x-show="index === 0">Harga Beli / Unit</label>
                             <div class="relative">
                                 <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-ink/40">Rp</span>
@@ -110,12 +110,12 @@
                             </div>
                         </div>
 
-                        <div class="sm:col-span-1">
+                        <div class="@4xl:col-span-1">
                             <label class="block text-xs font-medium text-ink/50 mb-1.5" x-show="index === 0">Subtotal</label>
                             <p class="text-sm font-medium tnum py-2.5" x-text="formatRupiah((item.qty || 0) * (item.buy_price || 0))"></p>
                         </div>
 
-                        <div class="sm:col-span-1 flex sm:justify-end sm:pt-6">
+                        <div class="@4xl:col-span-1 flex sm:justify-end sm:pt-6">
                             <button type="button" @click="removeItem(item.key)" x-show="items.length > 1"
                                     class="text-red-600/70 hover:text-red-700 p-1.5" title="Hapus baris">
                                 <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>

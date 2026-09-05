@@ -1,10 +1,10 @@
 <header class="h-16 border-b border-ink/10 bg-white/80 backdrop-blur-sm flex items-center justify-between px-4 sm:px-6 lg:px-10 shrink-0 sticky top-0 z-20">
     <div class="flex items-center gap-4">
-        {{-- Hamburger, hanya tampil di mobile --}}
+        {{-- Toggle sidebar — aktif di semua ukuran layar (mobile, tablet, desktop) --}}
         <button
-            @click="sidebarOpen = true"
-            class="lg:hidden -ml-1 p-2 rounded-lg text-ink/70 hover:text-ink hover:bg-ink/5"
-            aria-label="Buka menu"
+            @click="sidebarOpen = !sidebarOpen"
+            class="-ml-1 p-2 rounded-lg text-ink/70 hover:text-ink hover:bg-ink/5"
+            :aria-label="sidebarOpen ? 'Tutup menu' : 'Buka menu'"
         >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />

@@ -73,7 +73,7 @@
     </div>
 
     {{-- KPI: agregasi SQL atas SELURUH baris pada filter ini, independen dari pagination/pencarian deskripsi --}}
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div class="grid grid-cols-1 @4xl:grid-cols-3 gap-4 mb-6">
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
             <p class="text-xs font-medium text-ink/50 mb-2 uppercase tracking-wide">Jumlah Transaksi</p>
             <p class="font-display font-semibold text-2xl tnum">{{ number_format($kpis['count'], 0, ',', '.') }}</p>

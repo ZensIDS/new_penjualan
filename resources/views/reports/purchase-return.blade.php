@@ -8,7 +8,7 @@
     @include('reports.partials.date-filter', ['routeName' => 'reports.purchase-return', 'exportRouteName' => 'reports.export.purchase-return'])
 
     {{-- KPI: agregasi SQL atas SELURUH retur pada rentang tanggal, independen dari pagination/pencarian --}}
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+    <div class="grid grid-cols-1 @4xl:grid-cols-2 gap-4 mb-6">
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
             <p class="text-xs font-medium text-ink/50 mb-2 uppercase tracking-wide">Jumlah Retur</p>
             <p class="font-display font-semibold text-2xl tnum">{{ number_format($kpis['count'], 0, ',', '.') }}</p>

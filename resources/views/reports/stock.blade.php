@@ -7,7 +7,7 @@
 <div>
 
     {{-- KPI: agregasi SQL atas SELURUH data, independen dari pagination/pencarian --}}
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div class="grid grid-cols-1 @4xl:grid-cols-3 gap-4 mb-6">
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
             <p class="text-xs font-medium text-ink/50 mb-2 uppercase tracking-wide">Produk Terdaftar</p>
             <p class="font-display font-semibold text-2xl tnum">{{ number_format($kpis['product_count'], 0, ',', '.') }}</p>
@@ -29,7 +29,13 @@
             <h2 class="font-display font-semibold">Nilai Stok per Kategori</h2>
         </div>
         <div class="p-4">
-            <canvas id="stockByCategoryChart" height="90"></canvas>
+            <div class="relative h-56">
+                <canvas id="stockByCategoryChart"></canvas>
+                <div id="stockByCategoryChartEmpty" class="hidden absolute inset-0 flex flex-col items-center justify-center text-center gap-2 text-ink/40">
+                    <svg viewBox="0 0 24 24" class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg>
+                    <p class="text-xs">Belum ada data stok untuk ditampilkan</p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -152,6 +158,13 @@
         // Sumbernya sudah agregat dari server (GROUP BY kategori di SQL),
         // bukan dihitung ulang dari seluruh data produk di JS.
         const byCategory = @json($byCategory);
+        const values = byCategory.map(c => c.value);
+
+        if (!values.some(v => Number(v) > 0)) {
+            document.getElementById('stockByCategoryChart').classList.add('hidden');
+            document.getElementById('stockByCategoryChartEmpty').classList.remove('hidden');
+            return;
+        }
 
         new Chart(document.getElementById('stockByCategoryChart'), {
             type: 'bar',
@@ -159,7 +172,7 @@
                 labels: byCategory.map(c => c.name),
                 datasets: [{
                     label: 'Nilai Stok',
-                    data: byCategory.map(c => c.value),
+                    data: values,
                     backgroundColor: '#f59e0b',
                     borderRadius: 6,
                 }],
@@ -167,6 +180,7 @@
             options: {
                 indexAxis: 'y',
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: { legend: { display: false } },
                 scales: { x: { ticks: { callback: (v) => 'Rp ' + (v / 1000) + 'rb' } } },
             },

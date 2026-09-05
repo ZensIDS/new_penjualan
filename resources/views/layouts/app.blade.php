@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id" x-data="{ sidebarOpen: false }" class="h-full">
+<html lang="id" x-data="{ sidebarOpen: window.innerWidth >= 1024 }" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -157,7 +157,7 @@
         <div class="flex-1 flex flex-col min-w-0">
             @include('layouts.partials.topbar')
 
-            <main class="flex-1 px-4 sm:px-6 lg:px-10 py-8">
+            <main class="flex-1 min-w-0 px-4 sm:px-6 lg:px-10 py-8 @container">
                 <div class="max-w-6xl mx-auto animate-fade-slide">
 
                     @if (session('success'))

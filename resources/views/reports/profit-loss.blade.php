@@ -7,10 +7,10 @@
 
     @include('reports.partials.date-filter', ['routeName' => 'reports.profit-loss', 'exportRouteName' => 'reports.export.profit-loss'])
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 @4xl:grid-cols-3 gap-4">
 
         {{-- Ringkasan Laba Rugi --}}
-        <div class="lg:col-span-2 rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
+        <div class="@4xl:col-span-2 rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
             <div class="px-6 py-4 border-b border-ink/10 flex items-center gap-2.5">
                 <span class="h-7 w-7 rounded-lg bg-amber-50 flex items-center justify-center">
                     <svg viewBox="0 0 24 24" class="h-4 w-4 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 6-6 4 4 8-9M13.5 5H21v7.5"/></svg>
@@ -97,7 +97,13 @@
                 <p class="px-6 py-8 text-sm text-ink/40 text-center">Tidak ada biaya operasional pada periode ini.</p>
             @else
                 <div class="p-4">
-                    <canvas id="expenseCategoryChart" height="180"></canvas>
+                    <div class="relative h-56">
+                        <canvas id="expenseCategoryChart"></canvas>
+                        <div id="expenseCategoryChartEmpty" class="hidden absolute inset-0 flex flex-col items-center justify-center text-center gap-2 text-ink/40">
+                            <svg viewBox="0 0 24 24" class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18"/></svg>
+                            <p class="text-xs">Tidak ada biaya operasional pada periode ini</p>
+                        </div>
+                    </div>
                 </div>
                 <div class="divide-y divide-ink/[0.06] text-sm">
                     @foreach ($data['expense_by_category'] as $row)
@@ -111,7 +117,7 @@
         </div>
 
         {{-- Retur SO & PO periode ini --}}
-        <div class="lg:col-span-3 rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
+        <div class="@4xl:col-span-3 rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
             <div class="px-6 py-4 border-b border-ink/10 flex items-center justify-between gap-3 flex-wrap">
                 <div>
                     <h2 class="font-display font-semibold">Pembelian &amp; Retur SO / PO</h2>
@@ -128,7 +134,7 @@
                     </a>
                 </div>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-ink/[0.06] text-sm">
+            <div class="grid grid-cols-1 @4xl:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-ink/[0.06] text-sm">
                 <div class="px-6 py-4">
                     <p class="text-ink/60 mb-1">Total Pembelian (PO)</p>
                     <p class="tnum text-lg font-semibold">Rp {{ number_format($data['purchase'], 0, ',', '.') }}</p>
@@ -163,6 +169,12 @@
         const totals = @json($data['expense_by_category']->pluck('total'));
         const palette = ['#f59e0b', '#111214', '#10b981', '#ef4444', '#6366f1', '#eab308', '#0ea5e9', '#ec4899'];
 
+        if (!totals.some(v => Number(v) > 0)) {
+            el.classList.add('hidden');
+            document.getElementById('expenseCategoryChartEmpty').classList.remove('hidden');
+            return;
+        }
+
         new Chart(el, {
             type: 'doughnut',
             data: {
@@ -175,6 +187,7 @@
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
             },
         });

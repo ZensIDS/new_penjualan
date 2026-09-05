@@ -53,7 +53,7 @@
     {{-- KPI utama: hanya angka headline, masing-masing sekali tampil di sini.
          Rinciannya ada di card/section di bawah — tidak diulang sebagai card
          terpisah supaya tidak dobel. --}}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+    <div class="grid grid-cols-1 @lg:grid-cols-2 @4xl:grid-cols-4 gap-4 mb-4">
 
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
             <p class="text-xs font-medium text-ink/50 mb-2 uppercase tracking-wide">Laba Bersih</p>
@@ -101,10 +101,10 @@
     </div>
 
     {{-- Ringkasan Laba Rugi + panel Kas & Pembelian --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+    <div class="grid grid-cols-1 @4xl:grid-cols-3 gap-4 mb-6">
 
         {{-- Ringkasan Laba Rugi: satu-satunya tempat untuk alur pendapatan -> retur -> HPP -> laba --}}
-        <div class="lg:col-span-2 rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
+        <div class="@4xl:col-span-2 rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
             <div class="px-6 py-4 border-b border-ink/10 flex items-center gap-2.5">
                 <span class="h-7 w-7 rounded-lg bg-amber-50 flex items-center justify-center">
                     <svg viewBox="0 0 24 24" class="h-4 w-4 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 6-6 4 4 8-9M13.5 5H21v7.5"/></svg>
@@ -219,15 +219,21 @@
     </div>
 
     {{-- Grafik --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+    <div class="grid grid-cols-1 @4xl:grid-cols-3 gap-4 mb-6">
 
-        <div class="lg:col-span-2 rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
+        <div class="@4xl:col-span-2 rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
             <div class="px-6 py-4 border-b border-ink/10">
                 <h2 class="font-display font-semibold">Tren Penjualan &amp; Arus Kas Harian</h2>
                 <p class="text-xs text-ink/40 mt-0.5">Penjualan (accrual) dibanding kas masuk &amp; keluar riil</p>
             </div>
             <div class="p-4">
-                <canvas id="trendChart" height="110"></canvas>
+                <div class="relative h-56">
+                    <canvas id="trendChart"></canvas>
+                    <div id="trendChartEmpty" class="hidden absolute inset-0 flex flex-col items-center justify-center text-center gap-2 text-ink/40">
+                        <svg viewBox="0 0 24 24" class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/><path d="m3 3 18 18" stroke="currentColor" opacity="0.5"/></svg>
+                        <p class="text-xs">Belum ada data untuk periode ini</p>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -236,15 +242,21 @@
                 <h2 class="font-display font-semibold">Komposisi Biaya</h2>
                 <p class="text-xs text-ink/40 mt-0.5">Operasional vs. kas ke supplier</p>
             </div>
-            <div class="p-4 flex items-center justify-center">
-                <canvas id="expenseChart" height="220"></canvas>
+            <div class="p-4">
+                <div class="relative h-56">
+                    <canvas id="expenseChart"></canvas>
+                    <div id="expenseChartEmpty" class="hidden absolute inset-0 flex flex-col items-center justify-center text-center gap-2 text-ink/40">
+                        <svg viewBox="0 0 24 24" class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18"/></svg>
+                        <p class="text-xs">Belum ada biaya pada periode ini</p>
+                    </div>
+                </div>
             </div>
         </div>
 
     </div>
 
     {{-- Produk & Stok --}}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 @2xl:grid-cols-2 gap-4">
 
         {{-- Stok menipis --}}
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
@@ -312,6 +324,13 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // Helper: sembunyikan canvas & tampilkan pesan "tidak ada data" kalau semua nilainya kosong/0.
+        function showEmptyState(canvasId, emptyId) {
+            document.getElementById(canvasId).classList.add('hidden');
+            document.getElementById(emptyId).classList.remove('hidden');
+        }
+        const hasAnyValue = (arr) => arr.some(v => Number(v) > 0);
+
         const trendLabels = @json($dailySalesTrend->keys());
         const salesData   = @json($dailySalesTrend->values());
 
@@ -324,60 +343,72 @@
             return parts[2] + '/' + parts[1];
         });
 
-        new Chart(document.getElementById('trendChart'), {
-            type: 'line',
-            data: {
-                labels: displayLabels,
-                datasets: [
-                    {
-                        label: 'Penjualan',
-                        data: salesData,
-                        borderColor: '#f59e0b',
-                        backgroundColor: 'rgba(245,158,11,0.12)',
-                        tension: 0.3,
-                        fill: true,
-                    },
-                    {
-                        label: 'Kas Masuk',
-                        data: cashInData,
-                        borderColor: '#10b981',
-                        backgroundColor: 'rgba(16,185,129,0.08)',
-                        tension: 0.3,
-                    },
-                    {
-                        label: 'Kas Keluar',
-                        data: cashOutData,
-                        borderColor: '#ef4444',
-                        backgroundColor: 'rgba(239,68,68,0.08)',
-                        tension: 0.3,
-                    },
-                ],
-            },
-            options: {
-                responsive: true,
-                interaction: { mode: 'index', intersect: false },
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
-                scales: {
-                    y: { ticks: { callback: (v) => 'Rp ' + (v / 1000) + 'rb' } },
+        if (!hasAnyValue(salesData) && !hasAnyValue(cashInData) && !hasAnyValue(cashOutData)) {
+            showEmptyState('trendChart', 'trendChartEmpty');
+        } else {
+            new Chart(document.getElementById('trendChart'), {
+                type: 'line',
+                data: {
+                    labels: displayLabels,
+                    datasets: [
+                        {
+                            label: 'Penjualan',
+                            data: salesData,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245,158,11,0.12)',
+                            tension: 0.3,
+                            fill: true,
+                        },
+                        {
+                            label: 'Kas Masuk',
+                            data: cashInData,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16,185,129,0.08)',
+                            tension: 0.3,
+                        },
+                        {
+                            label: 'Kas Keluar',
+                            data: cashOutData,
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239,68,68,0.08)',
+                            tension: 0.3,
+                        },
+                    ],
                 },
-            },
-        });
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+                    scales: {
+                        y: { ticks: { callback: (v) => 'Rp ' + (v / 1000) + 'rb' } },
+                    },
+                },
+            });
+        }
 
-        new Chart(document.getElementById('expenseChart'), {
-            type: 'doughnut',
-            data: {
-                labels: ['Biaya Operasional', 'Kas ke Supplier (pembelian)'],
-                datasets: [{
-                    data: [{{ $expenseBreakdown['operational'] }}, {{ $expenseBreakdown['purchase'] }}],
-                    backgroundColor: ['#f59e0b', '#111214'],
-                    borderWidth: 0,
-                }],
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
-            },
-        });
+        const expenseData = [{{ $expenseBreakdown['operational'] }}, {{ $expenseBreakdown['purchase'] }}];
+
+        if (!hasAnyValue(expenseData)) {
+            showEmptyState('expenseChart', 'expenseChartEmpty');
+        } else {
+            new Chart(document.getElementById('expenseChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Biaya Operasional', 'Kas ke Supplier (pembelian)'],
+                    datasets: [{
+                        data: expenseData,
+                        backgroundColor: ['#f59e0b', '#111214'],
+                        borderWidth: 0,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+                },
+            });
+        }
     });
 </script>
 @endpush

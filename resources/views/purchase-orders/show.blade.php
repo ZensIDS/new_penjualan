@@ -56,9 +56,9 @@
         @endif
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 @4xl:grid-cols-3 gap-6">
 
-        <div class="lg:col-span-2 space-y-6">
+        <div class="@4xl:col-span-2 space-y-6">
 
             {{-- Item barang --}}
             <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
@@ -243,7 +243,7 @@
                                           class="px-6 py-4 bg-amber-50/40 space-y-3">
                                         @csrf
                                         @method('PUT')
-                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div class="grid grid-cols-1 @4xl:grid-cols-2 gap-3">
                                             <div>
                                                 <label class="block text-xs font-medium text-ink/50 mb-1">Tanggal Bayar</label>
                                                 <input type="date" name="payment_date" value="{{ $payment->payment_date->toDateString() }}"

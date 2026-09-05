@@ -8,7 +8,7 @@
     @include('reports.partials.date-filter', ['routeName' => 'reports.sales-return', 'exportRouteName' => 'reports.export.sales-return'])
 
     {{-- KPI: agregasi SQL atas SELURUH retur pada rentang tanggal, independen dari pagination/pencarian --}}
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div class="grid grid-cols-1 @4xl:grid-cols-3 gap-4 mb-6">
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-6">
             <p class="text-xs font-medium text-ink/50 mb-2 uppercase tracking-wide">Jumlah Retur</p>
             <p class="font-display font-semibold text-2xl tnum">{{ number_format($kpis['count'], 0, ',', '.') }}</p>
@@ -60,11 +60,11 @@
                 </button>
 
                 <div x-show="open" x-transition class="px-5 pb-4 pl-12">
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs mb-3">
+                    <div class="grid grid-cols-2 @4xl:grid-cols-3 gap-3 text-xs mb-3">
                         <div><p class="text-ink/40">Nilai Retur</p><p class="tnum font-medium text-red-700">Rp {{ number_format($r['total_amount'], 0, ',', '.') }}</p></div>
                         <div><p class="text-ink/40">HPP Retur</p><p class="tnum font-medium">Rp {{ number_format($r['total_hpp'], 0, ',', '.') }}</p></div>
                         @if ($r['note'])
-                            <div class="col-span-2 sm:col-span-1"><p class="text-ink/40">Catatan</p><p class="font-medium truncate">{{ $r['note'] }}</p></div>
+                            <div class="col-span-2 @4xl:col-span-1"><p class="text-ink/40">Catatan</p><p class="font-medium truncate">{{ $r['note'] }}</p></div>
                         @endif
                     </div>
                     <table class="w-full text-xs">
