@@ -123,8 +123,17 @@ class ReportService
 
     /**
      * Laporan Laba Rugi untuk rentang tanggal tertentu.
-     * Pendapatan - HPP (FIFO) = Laba Kotor. Laba Kotor - Biaya Operasional = Laba Bersih.
-     * Basis: so_date / expense_date (accrual), BUKAN tanggal pembayaran diterima.
+     * Pendapatan - HPP (FIFO) = Laba Kotor. Laba Kotor - Biaya Operasional + Pemasukan Lain = Laba Bersih.
+     * Basis: so_date / expense_date / income_date (accrual), BUKAN tanggal pembayaran/kas diterima.
+     *
+     * CATATAN PEMASUKAN LAIN: Income (mis. modal, pinjaman, dll) ditambahkan
+     * ke Laba Bersih di sini, TAPI HANYA untuk kategori yang ditandai
+     * affects_profit_loss=true (mis. jasa perbaikan, sisa ongkir) — kategori
+     * permodalan/pendanaan (Modal Disetor, Pinjaman Bank) sengaja TIDAK
+     * dihitung sebagai laba, karena itu bukan pendapatan usaha, meski tetap
+     * tercatat sebagai kas masuk di ledger cash_flows (lihat IncomeService).
+     * Kategori mana yang affects_profit_loss diatur di halaman Kategori
+     * Pemasukan (income_categories.affects_profit_loss).
      *
      * CATATAN PEMBELIAN (PO): nilai pembelian TIDAK dikurangkan langsung dari
      * laba di sini — itu bukan bug, tapi prinsip "matching cost vs revenue".
@@ -156,12 +165,46 @@ class ReportService
         $grossProfit = $revenue - $hpp;
 
         $operationalExpense = Expense::whereBetween('expense_date', [$startDate, $endDate])->sum('amount');
-        $netProfit = $grossProfit - $operationalExpense;
+
+        // Pemasukan Lain (mis. modal, pinjaman, dll) di luar penjualan — HANYA
+        // yang kategorinya ditandai affects_profit_loss=true yang ikut menambah
+        // Laba Bersih. Kategori permodalan/pendanaan (Modal Disetor, Pinjaman
+        // Bank, dll) TIDAK dihitung sebagai laba meski tetap tercatat sebagai
+        // kas masuk di ledger cash_flows (lihat IncomeService) — supaya tidak
+        // membuat usaha terlihat "untung" padahal itu cuma suntikan dana.
+        $otherIncome = Income::whereBetween('income_date', [$startDate, $endDate])
+            ->whereHas('category', fn($q) => $q->where('affects_profit_loss', true))
+            ->sum('amount');
+
+        $netProfit = $grossProfit - $operationalExpense + $otherIncome;
 
         $expenseByCategory = Expense::whereBetween('expense_date', [$startDate, $endDate])
             ->join('expense_categories', 'expenses.expense_category_id', '=', 'expense_categories.id')
             ->select('expense_categories.name', DB::raw('SUM(expenses.amount) as total'))
             ->groupBy('expense_categories.name')
+            ->get();
+
+        // Breakdown-nya juga hanya kategori yang affects_profit_loss=true,
+        // supaya jumlahnya konsisten dengan $otherIncome di atas.
+        $incomeByCategory = Income::whereBetween('income_date', [$startDate, $endDate])
+            ->join('income_categories', 'incomes.income_category_id', '=', 'income_categories.id')
+            ->where('income_categories.affects_profit_loss', true)
+            ->select('income_categories.name', DB::raw('SUM(incomes.amount) as total'))
+            ->groupBy('income_categories.name')
+            ->get();
+
+        // Pemasukan yang TIDAK dihitung ke laba (kategori permodalan/pendanaan)
+        // — ditampilkan sebagai INFORMASI saja, supaya tidak "hilang senyap"
+        // dari Ringkasan Laba Rugi walau tidak memengaruhi Laba Bersih.
+        $nonProfitLossIncome = Income::whereBetween('income_date', [$startDate, $endDate])
+            ->whereHas('category', fn($q) => $q->where('affects_profit_loss', false))
+            ->sum('amount');
+
+        $nonProfitLossIncomeByCategory = Income::whereBetween('income_date', [$startDate, $endDate])
+            ->join('income_categories', 'incomes.income_category_id', '=', 'income_categories.id')
+            ->where('income_categories.affects_profit_loss', false)
+            ->select('income_categories.name', DB::raw('SUM(incomes.amount) as total'))
+            ->groupBy('income_categories.name')
             ->get();
 
         // Retur Penjualan (SO) & Retur Pembelian (PO) pada periode ini,
@@ -189,6 +232,10 @@ class ReportService
             'gross_profit'           => (float) $grossProfit,
             'operational_expense'    => (float) $operationalExpense,
             'expense_by_category'    => $expenseByCategory,
+            'other_income'           => (float) $otherIncome,
+            'income_by_category'     => $incomeByCategory,
+            'non_profit_loss_income'              => (float) $nonProfitLossIncome,
+            'non_profit_loss_income_by_category'  => $nonProfitLossIncomeByCategory,
             'net_profit'             => (float) $netProfit,
             'sales_return'           => (float) $salesReturnAmount,
             'sales_return_hpp'       => (float) $salesReturnHpp,

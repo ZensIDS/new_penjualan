@@ -9,7 +9,11 @@ class IncomeCategory extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name'];
+    protected $fillable = ['name', 'affects_profit_loss'];
+
+    protected $casts = [
+        'affects_profit_loss' => 'boolean',
+    ];
 
     public function incomes()
     {

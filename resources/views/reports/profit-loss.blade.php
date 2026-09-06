@@ -63,6 +63,24 @@
                         </div>
                     @endif
                 </div>
+                <div class="px-6 py-3.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-ink/60">
+                            <a href="{{ route('reports.incomes', ['start_date' => $startDate, 'end_date' => $endDate]) }}" class="hover:text-amber-700 underline decoration-dotted underline-offset-2">Pemasukan Lain</a>
+                        </span>
+                        <span class="tnum text-emerald-700">+ Rp {{ number_format($data['other_income'], 0, ',', '.') }}</span>
+                    </div>
+                    @if ($data['income_by_category']->isNotEmpty())
+                        <div class="mt-2 space-y-1 pl-3 border-l-2 border-ink/10">
+                            @foreach ($data['income_by_category'] as $row)
+                                <div class="flex items-center justify-between text-xs text-ink/40">
+                                    <span>{{ $row->name }}</span>
+                                    <span class="tnum">Rp {{ number_format($row->total, 0, ',', '.') }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
                 <div class="flex items-center justify-between px-6 py-3.5 font-semibold bg-amber-50/60">
                     <span>Laba Bersih</span>
                     <span class="tnum {{ $data['net_profit'] < 0 ? 'text-red-700' : 'text-emerald-700' }}">
@@ -84,10 +102,30 @@
                     <span>Retur Pembelian (PO)</span>
                     <span class="tnum">Rp {{ number_format($data['purchase_return'], 0, ',', '.') }}</span>
                 </div>
+                @if ($data['non_profit_loss_income'] > 0)
+                    <div class="mt-3 pt-3 border-t border-ink/10">
+                        <p class="text-xs text-ink/40 mb-2">
+                            Pemasukan Permodalan/Pendanaan &mdash; tidak dihitung sebagai laba (mis. Modal Disetor, Pinjaman Bank), meski tetap tercatat sebagai kas masuk di Laporan Arus Kas.
+                        </p>
+                        <div class="flex items-center justify-between text-xs text-ink/50">
+                            <span>
+                                <a href="{{ route('reports.incomes', ['start_date' => $startDate, 'end_date' => $endDate]) }}" class="hover:text-amber-700 underline decoration-dotted underline-offset-2">Total periode ini</a>
+                            </span>
+                            <span class="tnum">Rp {{ number_format($data['non_profit_loss_income'], 0, ',', '.') }}</span>
+                        </div>
+                        @foreach ($data['non_profit_loss_income_by_category'] as $row)
+                            <div class="flex items-center justify-between text-xs text-ink/40 mt-1 pl-3">
+                                <span>{{ $row->name }}</span>
+                                <span class="tnum">Rp {{ number_format($row->total, 0, ',', '.') }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             </div>
         </div>
 
-        {{-- Biaya operasional per kategori --}}
+        {{-- Biaya operasional & pemasukan lain per kategori --}}
+        <div class="flex flex-col gap-4">
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
             <div class="px-6 py-4 border-b border-ink/10">
                 <h2 class="font-display font-semibold">Biaya per Kategori</h2>
@@ -114,6 +152,36 @@
                     @endforeach
                 </div>
             @endif
+        </div>
+
+        {{-- Pemasukan lain per kategori --}}
+        <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
+            <div class="px-6 py-4 border-b border-ink/10">
+                <h2 class="font-display font-semibold">Pemasukan Lain per Kategori</h2>
+                <p class="text-xs text-ink/40 mt-0.5">Rincian pemasukan di luar penjualan</p>
+            </div>
+            @if ($data['income_by_category']->isEmpty())
+                <p class="px-6 py-8 text-sm text-ink/40 text-center">Tidak ada pemasukan lain pada periode ini.</p>
+            @else
+                <div class="p-4">
+                    <div class="relative h-56">
+                        <canvas id="incomeCategoryChart"></canvas>
+                        <div id="incomeCategoryChartEmpty" class="hidden absolute inset-0 flex flex-col items-center justify-center text-center gap-2 text-ink/40">
+                            <svg viewBox="0 0 24 24" class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18"/></svg>
+                            <p class="text-xs">Tidak ada pemasukan lain pada periode ini</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="divide-y divide-ink/[0.06] text-sm">
+                    @foreach ($data['income_by_category'] as $row)
+                        <div class="flex items-center justify-between px-6 py-3">
+                            <span class="text-ink/60">{{ $row->name }}</span>
+                            <span class="tnum">Rp {{ number_format($row->total, 0, ',', '.') }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
         </div>
 
         {{-- Retur SO & PO periode ini --}}
@@ -172,6 +240,38 @@
         if (!totals.some(v => Number(v) > 0)) {
             el.classList.add('hidden');
             document.getElementById('expenseCategoryChartEmpty').classList.remove('hidden');
+            return;
+        }
+
+        new Chart(el, {
+            type: 'doughnut',
+            data: {
+                labels: categories,
+                datasets: [{
+                    data: totals,
+                    backgroundColor: categories.map((_, i) => palette[i % palette.length]),
+                    borderWidth: 0,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+            },
+        });
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const el = document.getElementById('incomeCategoryChart');
+        if (!el) return;
+
+        const categories = @json($data['income_by_category']->pluck('name'));
+        const totals = @json($data['income_by_category']->pluck('total'));
+        const palette = ['#10b981', '#f59e0b', '#111214', '#6366f1', '#eab308', '#0ea5e9', '#ec4899', '#ef4444'];
+
+        if (!totals.some(v => Number(v) > 0)) {
+            el.classList.add('hidden');
+            document.getElementById('incomeCategoryChartEmpty').classList.remove('hidden');
             return;
         }
 

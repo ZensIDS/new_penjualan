@@ -14,7 +14,8 @@ class StoreIncomeCategoryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255', 'unique:income_categories,name'],
+            'name'                 => ['required', 'string', 'max:255', 'unique:income_categories,name'],
+            'affects_profit_loss'  => ['sometimes', 'boolean'],
         ];
     }
 }

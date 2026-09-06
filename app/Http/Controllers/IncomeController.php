@@ -18,7 +18,7 @@ class IncomeController extends Controller
             ->latest('income_date')
             ->paginate(10);
 
-        $incomeCategories = IncomeCategory::orderBy('name')->get(['id', 'name']);
+        $incomeCategories = IncomeCategory::orderBy('name')->get(['id', 'name', 'affects_profit_loss']);
 
         return view('incomes.index', compact('incomes', 'incomeCategories'));
     }

@@ -19,7 +19,10 @@ class IncomeCategoryController extends Controller
 
     public function store(StoreIncomeCategoryRequest $request)
     {
-        $incomeCategory = IncomeCategory::create($request->validated());
+        $data = $request->validated();
+        $data['affects_profit_loss'] = $request->boolean('affects_profit_loss');
+
+        $incomeCategory = IncomeCategory::create($data);
 
         return response()->json([
             'message' => 'Kategori pemasukan berhasil ditambahkan.',
@@ -29,7 +32,10 @@ class IncomeCategoryController extends Controller
 
     public function update(UpdateIncomeCategoryRequest $request, IncomeCategory $incomeCategory)
     {
-        $incomeCategory->update($request->validated());
+        $data = $request->validated();
+        $data['affects_profit_loss'] = $request->boolean('affects_profit_loss');
+
+        $incomeCategory->update($data);
 
         return response()->json([
             'message' => 'Kategori pemasukan berhasil diperbarui.',

@@ -17,7 +17,8 @@ class UpdateIncomeCategoryRequest extends FormRequest
         $incomeCategory = $this->route('incomeCategory') ?? $this->route('income_category');
 
         return [
-            'name' => ['required', 'string', 'max:255', Rule::unique('income_categories', 'name')->ignore($incomeCategory)],
+            'name'                => ['required', 'string', 'max:255', Rule::unique('income_categories', 'name')->ignore($incomeCategory)],
+            'affects_profit_loss' => ['sometimes', 'boolean'],
         ];
     }
 }

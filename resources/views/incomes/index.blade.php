@@ -119,7 +119,7 @@
                             <select x-ref="categorySelect" x-init="initCategorySelect($el)">
                                 <option value="">— Pilih kategori —</option>
                                 <template x-for="cat in incomeCategories" :key="cat.id">
-                                    <option :value="cat.id" x-text="cat.name"></option>
+                                    <option :value="cat.id" x-text="cat.name + (cat.affects_profit_loss ? '' : ' (di luar laba rugi)')"></option>
                                 </template>
                             </select>
                             <p class="text-xs text-red-600 mt-1" x-text="errors.income_category_id?.[0]"></p>

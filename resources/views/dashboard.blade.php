@@ -158,6 +158,24 @@
                         </div>
                     @endif
                 </div>
+                <div class="px-6 py-3.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-ink/60">
+                            <a href="{{ route('reports.incomes', ['start_date' => $startDate, 'end_date' => $endDate]) }}" class="hover:text-amber-700 underline decoration-dotted underline-offset-2">Pemasukan Lain</a>
+                        </span>
+                        <span class="tnum text-emerald-700">+ Rp {{ number_format($profitLoss['other_income'], 0, ',', '.') }}</span>
+                    </div>
+                    @if ($profitLoss['income_by_category']->isNotEmpty())
+                        <div class="mt-2 space-y-1 pl-3 border-l-2 border-ink/10">
+                            @foreach ($profitLoss['income_by_category'] as $row)
+                                <div class="flex items-center justify-between text-xs text-ink/40">
+                                    <span>{{ $row->name }}</span>
+                                    <span class="tnum">Rp {{ number_format($row->total, 0, ',', '.') }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
                 <div class="flex items-center justify-between px-6 py-3.5 font-semibold bg-amber-50/60">
                     <span>Laba Bersih</span>
                     <span class="tnum {{ $profitLoss['net_profit'] < 0 ? 'text-red-700' : 'text-emerald-700' }}">
@@ -172,6 +190,12 @@
                     Retur Pembelian (PO) periode ini: Rp {{ number_format($profitLoss['purchase_return'], 0, ',', '.') }}
                     &mdash; mengurangi hutang, belum memengaruhi laba (lihat panel Pembelian di samping).
                 </p>
+                @if ($profitLoss['non_profit_loss_income'] > 0)
+                    <p class="text-xs text-ink/40 mt-2 pt-2 border-t border-ink/10">
+                        Pemasukan Permodalan/Pendanaan (Modal, Pinjaman, dll) periode ini: Rp {{ number_format($profitLoss['non_profit_loss_income'], 0, ',', '.') }}
+                        &mdash; tercatat sebagai kas masuk, tidak dihitung sebagai laba.
+                    </p>
+                @endif
             </div>
         </div>
 

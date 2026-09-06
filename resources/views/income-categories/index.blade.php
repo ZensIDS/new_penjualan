@@ -36,6 +36,7 @@
                 <thead>
                     <tr class="bg-ink/[0.03] text-left text-ink/50">
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Nama</th>
+                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Masuk Laba Rugi?</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Jml Pemasukan</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Aksi</th>
                     </tr>
@@ -44,6 +45,13 @@
                     @forelse ($incomeCategories as $category)
                         <tr class="hover:bg-amber-50/40 transition-colors">
                             <td class="px-5 py-3.5 font-medium">{{ $category->name }}</td>
+                            <td class="px-5 py-3.5">
+                                @if ($category->affects_profit_loss)
+                                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Ya</span>
+                                @else
+                                    <span class="inline-flex items-center rounded-full bg-ink/[0.05] px-2.5 py-1 text-xs font-semibold text-ink/60">Tidak (modal/pendanaan)</span>
+                                @endif
+                            </td>
                             <td class="px-5 py-3.5 tnum">
                                 <span class="inline-flex items-center rounded-full bg-ink/[0.05] px-2.5 py-1 text-xs font-semibold text-ink/70">
                                     {{ $category->incomes_count }}
@@ -64,7 +72,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="3" class="px-5 py-10 text-center text-ink/40">Belum ada kategori pemasukan.</td>
+                            <td colspan="4" class="px-5 py-10 text-center text-ink/40">Belum ada kategori pemasukan.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -109,6 +117,18 @@
                         <p class="text-xs text-red-600 mt-1" x-text="errors.name?.[0]"></p>
                     </div>
 
+                    <div class="mt-4">
+                        <label class="flex items-start gap-2.5 cursor-pointer">
+                            <input type="checkbox" x-model="form.affects_profit_loss"
+                                   class="mt-0.5 h-4 w-4 rounded border-ink/25 text-amber-500 focus:ring-amber-500/40">
+                            <span class="text-sm">
+                                <span class="font-medium">Masuk hitungan Laba Rugi</span>
+                                <span class="block text-xs text-ink/40 mt-0.5">Aktifkan untuk kategori seperti jasa perbaikan / sisa ongkir. Matikan untuk kategori permodalan seperti Modal Disetor / Pinjaman Bank — tetap tercatat sebagai kas masuk, tapi tidak dihitung sebagai laba.</span>
+                            </span>
+                        </label>
+                        <p class="text-xs text-red-600 mt-1" x-text="errors.affects_profit_loss?.[0]"></p>
+                    </div>
+
                     <div class="mt-6 flex justify-end gap-2">
                         <button type="button" @click="modalOpen = false"
                                 class="text-sm font-medium px-4 py-2.5 rounded-xl border border-ink/12 hover:bg-ink/[0.03] transition-colors">Batal</button>
@@ -134,18 +154,18 @@
             errors: {},
             flash: null,
             flashType: 'success',
-            form: { name: '' },
+            form: { name: '', affects_profit_loss: true },
 
             openCreate() {
                 this.editing = null;
-                this.form = { name: '' };
+                this.form = { name: '', affects_profit_loss: true };
                 this.errors = {};
                 this.modalOpen = true;
             },
 
             openEdit(category) {
                 this.editing = category;
-                this.form = { name: category.name };
+                this.form = { name: category.name, affects_profit_loss: !!category.affects_profit_loss };
                 this.errors = {};
                 this.modalOpen = true;
             },

@@ -145,7 +145,9 @@ class ReportExportController extends Controller
             ['label' => 'HPP (FIFO)', 'value' => -$data['hpp'], 'format' => ExcelStyler::FMT_RP],
             ['label' => 'Laba Kotor', 'value' => $data['gross_profit'], 'format' => ExcelStyler::FMT_RP],
             ['label' => 'Biaya Operasional', 'value' => -$data['operational_expense'], 'format' => ExcelStyler::FMT_RP],
+            ['label' => 'Pemasukan Lain (masuk laba)', 'value' => $data['other_income'], 'format' => ExcelStyler::FMT_RP],
             ['label' => 'Laba Bersih', 'value' => $data['net_profit'], 'format' => ExcelStyler::FMT_RP, 'highlight' => true],
+            ['label' => 'Pemasukan Permodalan/Pendanaan - info, tidak dihitung sebagai laba', 'value' => $data['non_profit_loss_income'], 'format' => ExcelStyler::FMT_RP],
             ['label' => 'Total Pembelian (PO) - info, belum jadi HPP (masih stok)', 'value' => $data['purchase'], 'format' => ExcelStyler::FMT_RP],
             ['label' => 'Retur Pembelian (PO) - info, tidak memengaruhi laba', 'value' => $data['purchase_return'], 'format' => ExcelStyler::FMT_RP],
         ], $colSpan);
@@ -162,6 +164,21 @@ class ReportExportController extends Controller
             $sheet->setCellValue("A{$tableStart}", 'Tidak ada biaya operasional pada periode ini.');
         } else {
             ExcelStyler::totalsRow($sheet, $row, ['Total', $data['operational_expense']], currencyCols: [2]);
+        }
+        $row++;
+
+        $row = ExcelStyler::sectionTitle($sheet, $row, 'Pemasukan Lain per Kategori', $colSpan);
+        $row = ExcelStyler::header($sheet, $row, ['Kategori', 'Jumlah']);
+
+        $incomeRows = $data['income_by_category']->map(fn($i) => [$i->name, (float) $i->total]);
+        $incomeTableStart = $row;
+        $row = ExcelStyler::rows($sheet, $row, $incomeRows, currencyCols: [2]);
+
+        if ($incomeRows->isEmpty()) {
+            $sheet->mergeCells("A{$incomeTableStart}:B{$incomeTableStart}");
+            $sheet->setCellValue("A{$incomeTableStart}", 'Tidak ada pemasukan lain pada periode ini.');
+        } else {
+            ExcelStyler::totalsRow($sheet, $row, ['Total', $data['other_income']], currencyCols: [2]);
         }
 
         ExcelStyler::setColumnWidths($sheet, [42, 22]);
