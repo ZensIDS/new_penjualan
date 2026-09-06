@@ -14,9 +14,11 @@
         ],
         'Penjualan' => [
             ['label' => 'Sales Order', 'route' => 'sales-orders.index', 'pattern' => 'sales-orders.*'],
-            ['label' => 'Asal Penjualan', 'route' => 'sale-sources.index', 'pattern' => 'sale-sources.*'],
+            ['label' => 'Customer', 'route' => 'customers.index', 'pattern' => 'customers.*'],
         ],
         'Operasional' => [
+            ['label' => 'Kategori Pemasukan', 'route' => 'income-categories.index', 'pattern' => 'income-categories.*'],
+            ['label' => 'Pemasukan Lain', 'route' => 'incomes.index', 'pattern' => 'incomes.*'],
             ['label' => 'Kategori Pengeluaran', 'route' => 'expense-categories.index', 'pattern' => 'expense-categories.*'],
             ['label' => 'Pengeluaran', 'route' => 'expenses.index', 'pattern' => 'expenses.*'],
         ],
@@ -29,6 +31,7 @@
             ['label' => 'Retur Penjualan (SO)', 'route' => 'reports.sales-return', 'pattern' => 'reports.sales-return'],
             ['label' => 'Retur Pembelian (PO)', 'route' => 'reports.purchase-return', 'pattern' => 'reports.purchase-return'],
             ['label' => 'Pengeluaran', 'route' => 'reports.expenses', 'pattern' => 'reports.expenses'],
+            ['label' => 'Pemasukan Lain', 'route' => 'reports.incomes', 'pattern' => 'reports.incomes'],
         ],
     ];
 @endphp

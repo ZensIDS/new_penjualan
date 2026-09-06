@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\CashFlow;
 use App\Models\Expense;
+use App\Models\Income;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
@@ -714,6 +715,84 @@ class ReportService
             'category'     => $e->category->name ?? '—',
             'description'  => $e->description,
             'amount'       => (float) $e->amount,
+        ];
+    }
+
+    /**
+     * Laporan Pemasukan Lain (di luar penjualan) — strukturnya sengaja
+     * paralel 1:1 dengan expenseReportPaginated()/expenseReport()/
+     * expenseReportKpis() di atas, cuma sumber datanya dari tabel incomes.
+     */
+    public function incomeReportPaginated(string $startDate, string $endDate, ?int $categoryId = null, ?string $search = null, int $perPage = 25)
+    {
+        $paginator = $this->incomeQuery($startDate, $endDate, $categoryId, $search)
+            ->orderByDesc('income_date')->orderByDesc('id')
+            ->paginate($perPage)->withQueryString();
+
+        $paginator->setCollection(
+            $paginator->getCollection()->map(fn(Income $i) => $this->mapIncome($i))
+        );
+
+        return $paginator;
+    }
+
+    /**
+     * Sama seperti incomeReportPaginated(), tapi ambil SEMUA baris
+     * sekaligus (tanpa pagination) — khusus dipakai untuk export Excel.
+     */
+    public function incomeReport(string $startDate, string $endDate, ?int $categoryId = null, ?string $search = null)
+    {
+        return $this->incomeQuery($startDate, $endDate, $categoryId, $search)
+            ->orderByDesc('income_date')->orderByDesc('id')
+            ->get()
+            ->map(fn(Income $i) => $this->mapIncome($i));
+    }
+
+    private function incomeQuery(string $startDate, string $endDate, ?int $categoryId = null, ?string $search = null)
+    {
+        $query = Income::with('category')->whereBetween('income_date', [$startDate, $endDate]);
+
+        if (filled($categoryId)) {
+            $query->where('income_category_id', $categoryId);
+        }
+
+        if (filled($search)) {
+            $query->where('description', 'like', '%' . $search . '%');
+        }
+
+        return $query;
+    }
+
+    /**
+     * KPI pemasukan (jumlah transaksi, total, rata-rata) dihitung via
+     * agregasi SQL atas SELURUH baris pada filter yang sama (kategori +
+     * rentang tanggal), independen dari pagination/pencarian deskripsi.
+     */
+    public function incomeReportKpis(string $startDate, string $endDate, ?int $categoryId = null): array
+    {
+        $base = Income::whereBetween('income_date', [$startDate, $endDate]);
+
+        if (filled($categoryId)) {
+            $base->where('income_category_id', $categoryId);
+        }
+
+        $count = (clone $base)->count();
+        $total = (float) (clone $base)->sum('amount');
+
+        return [
+            'count'   => $count,
+            'total'   => $total,
+            'average' => $count > 0 ? $total / $count : 0.0,
+        ];
+    }
+
+    private function mapIncome(Income $i): array
+    {
+        return [
+            'income_date' => $i->income_date->format('Y-m-d'),
+            'category'    => $i->category->name ?? '—',
+            'description' => $i->description,
+            'amount'      => (float) $i->amount,
         ];
     }
 }

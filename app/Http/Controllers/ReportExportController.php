@@ -392,6 +392,52 @@ class ReportExportController extends Controller
         return ExcelStyler::download($spreadsheet, "laporan-pengeluaran-{$start}_sd_{$end}.xlsx");
     }
 
+    public function incomes(Request $request)
+    {
+        [$start, $end] = $this->resolveRange($request);
+        $categoryId = $request->filled('category_id') ? (int) $request->input('category_id') : null;
+
+        $data = $this->reportService->incomeReport($start, $end, $categoryId);
+        $categoryName = $categoryId
+            ? (\App\Models\IncomeCategory::find($categoryId)->name ?? null)
+            : null;
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Pemasukan Lain');
+
+        $colSpan = 4;
+        $period = 'Periode: ' . Carbon::parse($start)->translatedFormat('d M Y') . ' - ' . Carbon::parse($end)->translatedFormat('d M Y')
+            . ($categoryName ? " | Kategori: {$categoryName}" : '');
+        $row = ExcelStyler::title($sheet, 'Laporan Pemasukan Lain', $period, $colSpan);
+
+        $row = ExcelStyler::summaryBlock($sheet, $row, [
+            ['label' => 'Jumlah Transaksi', 'value' => $data->count(), 'format' => ExcelStyler::FMT_NUMBER],
+            ['label' => 'Total Pemasukan', 'value' => $data->sum('amount'), 'format' => ExcelStyler::FMT_RP, 'highlight' => true],
+        ], $colSpan);
+
+        $row = ExcelStyler::header($sheet, $row, ['Tanggal', 'Kategori', 'Deskripsi', 'Jumlah']);
+
+        $tableStart = $row;
+        $row = ExcelStyler::rows($sheet, $row, $data->map(fn($i) => [
+            Carbon::parse($i['income_date'])->format('d-m-Y'),
+            $i['category'],
+            $i['description'] ?? '',
+            $i['amount'],
+        ]), currencyCols: [4]);
+
+        if ($data->isEmpty()) {
+            $sheet->mergeCells("A{$tableStart}:D{$tableStart}");
+            $sheet->setCellValue("A{$tableStart}", 'Tidak ada pemasukan pada periode ini.');
+        } else {
+            ExcelStyler::totalsRow($sheet, $row, ['Total', '', '', $data->sum('amount')], currencyCols: [4]);
+        }
+
+        ExcelStyler::setColumnWidths($sheet, [14, 22, 44, 18]);
+
+        return ExcelStyler::download($spreadsheet, "laporan-pemasukan-lain-{$start}_sd_{$end}.xlsx");
+    }
+
     /**
      * Bangun sheet utama untuk laporan AP/AR — bentuknya sama persis, cuma beda label & key.
      */

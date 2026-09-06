@@ -138,6 +138,27 @@ class ReportController extends Controller
         ]);
     }
 
+    public function incomes(Request $request)
+    {
+        [$start, $end] = $this->resolveRange($request);
+        $search = $request->input('search');
+        $categoryId = $request->filled('category_id') ? (int) $request->input('category_id') : null;
+
+        $data = $this->reportService->incomeReportPaginated($start, $end, $categoryId, $search, 10);
+        $kpis = $this->reportService->incomeReportKpis($start, $end, $categoryId);
+        $categories = \App\Models\IncomeCategory::orderBy('name')->get(['id', 'name']);
+
+        return view('reports.incomes', [
+            'data'       => $data,
+            'kpis'       => $kpis,
+            'categories' => $categories,
+            'categoryId' => $categoryId,
+            'search'     => $search,
+            'startDate'  => $start,
+            'endDate'    => $end,
+        ]);
+    }
+
     /**
      * Resolve rentang tanggal dari query string (default: bulan berjalan).
      * Dipakai bareng oleh profitLoss() & cashFlow() supaya perilaku filter konsisten

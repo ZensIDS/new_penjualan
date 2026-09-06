@@ -6,6 +6,8 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseCategoryController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\IncomeCategoryController;
+use App\Http\Controllers\IncomeController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchaseReturnController;
@@ -71,6 +73,8 @@ Route::middleware('auth')->group(function () {
     Route::get('sale-sources', [SaleSourceController::class, 'index'])->name('sale-sources.index');
     Route::get('expenses', [ExpenseController::class, 'index'])->name('expenses.index');
     Route::get('expense-categories', [ExpenseCategoryController::class, 'index'])->name('expense-categories.index');
+    Route::get('incomes', [IncomeController::class, 'index'])->name('incomes.index');
+    Route::get('income-categories', [IncomeCategoryController::class, 'index'])->name('income-categories.index');
 
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('stock', [ReportController::class, 'stock'])->name('stock');
@@ -81,6 +85,7 @@ Route::middleware('auth')->group(function () {
         Route::get('sales-return', [ReportController::class, 'salesReturn'])->name('sales-return');
         Route::get('purchase-return', [ReportController::class, 'purchaseReturn'])->name('purchase-return');
         Route::get('expenses', [ReportController::class, 'expenses'])->name('expenses');
+        Route::get('incomes', [ReportController::class, 'incomes'])->name('incomes');
 
         Route::prefix('export')->name('export.')->group(function () {
             Route::get('stock', [ReportExportController::class, 'stock'])->name('stock');
@@ -91,6 +96,7 @@ Route::middleware('auth')->group(function () {
             Route::get('sales-return', [ReportExportController::class, 'salesReturn'])->name('sales-return');
             Route::get('purchase-return', [ReportExportController::class, 'purchaseReturn'])->name('purchase-return');
             Route::get('expenses', [ReportExportController::class, 'expenses'])->name('expenses');
+            Route::get('incomes', [ReportExportController::class, 'incomes'])->name('incomes');
         });
     });
 });
@@ -151,5 +157,11 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
         ->only(['store', 'update', 'destroy']);
 
     Route::resource('expense-categories', ExpenseCategoryController::class)
+        ->only(['store', 'update', 'destroy']);
+
+    Route::resource('incomes', IncomeController::class)
+        ->only(['store', 'update', 'destroy']);
+
+    Route::resource('income-categories', IncomeCategoryController::class)
         ->only(['store', 'update', 'destroy']);
 });
