@@ -11,7 +11,7 @@ class SaleSourceController extends Controller
     public function index()
     {
         $saleSources = SaleSource::withCount('salesOrders')
-            ->orderBy('name')
+            ->latest()
             ->paginate(10);
 
         return view('sale-sources.index', compact('saleSources'));

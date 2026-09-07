@@ -11,7 +11,7 @@ class IncomeCategoryController extends Controller
     public function index()
     {
         $incomeCategories = IncomeCategory::withCount('incomes')
-            ->orderBy('name')
+            ->latest()
             ->paginate(10);
 
         return view('income-categories.index', compact('incomeCategories'));

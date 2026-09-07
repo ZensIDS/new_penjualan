@@ -12,7 +12,7 @@ class ProductController extends Controller
     public function index()
     {
         $products = Product::with('category')
-            ->orderBy('name')
+            ->latest()
             ->paginate(10);
 
         $categories = Category::orderBy('name')->get(['id', 'name']);

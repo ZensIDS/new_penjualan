@@ -16,6 +16,7 @@ class IncomeController extends Controller
     {
         $incomes = Income::with('category')
             ->latest('income_date')
+            ->latest('id')
             ->paginate(10);
 
         $incomeCategories = IncomeCategory::orderBy('name')->get(['id', 'name', 'affects_profit_loss']);

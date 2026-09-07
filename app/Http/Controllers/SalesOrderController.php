@@ -22,6 +22,7 @@ class SalesOrderController extends Controller
     {
         $salesOrders = SalesOrder::with('customer')
             ->latest('so_date')
+            ->latest('id')
             ->paginate(10);
 
         return view('sales-orders.index', compact('salesOrders'));
