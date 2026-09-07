@@ -13,14 +13,29 @@ class SupplierController extends Controller
     {
         $startDate = $request->input('start_date');
         $endDate   = $request->input('end_date');
+        $search    = trim((string) $request->input('search', ''));
 
-        $suppliers = Supplier::when($startDate, fn($q) => $q->whereDate('created_at', '>=', $startDate))
+        $suppliers = Supplier::query()
+            ->when($startDate, fn($q) => $q->whereDate('created_at', '>=', $startDate))
             ->when($endDate, fn($q) => $q->whereDate('created_at', '<=', $endDate))
+            ->when($search !== '', function ($q) use ($search) {
+                // Cari di semua kolom yang tampil di tabel: Nama, Kontak, Telepon, Email.
+                $q->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('contact_person', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            })
             ->latest()
             ->paginate(10)
             ->withQueryString();
 
-        return view('suppliers.index', compact('suppliers', 'startDate', 'endDate'));
+        if ($request->ajax()) {
+            return view('suppliers._table', compact('suppliers'));
+        }
+
+        return view('suppliers.index', compact('suppliers', 'startDate', 'endDate', 'search'));
     }
 
     public function store(StoreSupplierRequest $request)

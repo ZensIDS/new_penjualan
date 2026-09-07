@@ -13,14 +13,28 @@ class CustomerController extends Controller
     {
         $startDate = $request->input('start_date');
         $endDate   = $request->input('end_date');
+        $search    = trim((string) $request->input('search', ''));
 
-        $customers = Customer::when($startDate, fn($q) => $q->whereDate('created_at', '>=', $startDate))
+        $customers = Customer::query()
+            ->when($startDate, fn($q) => $q->whereDate('created_at', '>=', $startDate))
             ->when($endDate, fn($q) => $q->whereDate('created_at', '<=', $endDate))
+            ->when($search !== '', function ($q) use ($search) {
+                // Cari di semua kolom yang tampil di tabel: Nama, Telepon, Email.
+                $q->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            })
             ->latest()
             ->paginate(10)
             ->withQueryString();
 
-        return view('customers.index', compact('customers', 'startDate', 'endDate'));
+        if ($request->ajax()) {
+            return view('customers._table', compact('customers'));
+        }
+
+        return view('customers.index', compact('customers', 'startDate', 'endDate', 'search'));
     }
 
     public function store(StoreCustomerRequest $request)

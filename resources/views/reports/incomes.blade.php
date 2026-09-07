@@ -88,55 +88,39 @@
         </div>
     </div>
 
-    <form method="GET" action="{{ route('reports.incomes') }}" class="relative max-w-sm mb-4">
-        <input type="hidden" name="start_date" value="{{ $startDate }}">
-        <input type="hidden" name="end_date" value="{{ $endDate }}">
-        <input type="hidden" name="category_id" value="{{ $categoryId }}">
+    {{-- Search: AJAX, tidak perlu tekan Enter --}}
+    <div class="relative max-w-sm mb-4">
         <svg viewBox="0 0 24 24" class="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink/35" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="m21 21-4.3-4.3"/></svg>
-        <input type="text" name="search" value="{{ $search }}" placeholder="Cari deskripsi pemasukan..." onchange="this.form.submit()"
-               class="w-full rounded-xl border border-ink/12 pl-10 pr-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
-    </form>
-
-    {{-- Tabel per item, urut tanggal terbaru --}}
-    <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
-        @if ($data->isEmpty())
-            <p class="px-5 py-10 text-center text-ink/40 text-sm">
-                @if ($search)
-                    Tidak ada pemasukan yang cocok dengan pencarian.
-                @else
-                    Tidak ada pemasukan pada periode / kategori ini.
-                @endif
-            </p>
-        @else
-            <table class="w-full text-sm">
-                <thead>
-                    <tr class="text-left text-ink/40 text-xs uppercase tracking-wide border-b border-ink/10">
-                        <th class="px-5 py-3 font-medium">Tanggal</th>
-                        <th class="px-5 py-3 font-medium">Kategori</th>
-                        <th class="px-5 py-3 font-medium">Deskripsi</th>
-                        <th class="px-5 py-3 font-medium text-right">Jumlah</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-ink/[0.06]">
-                    @foreach ($data as $i)
-                        <tr class="hover:bg-amber-50/30 transition-colors">
-                            <td class="px-5 py-3 tnum whitespace-nowrap">{{ \Illuminate\Support\Carbon::parse($i['income_date'])->format('d M Y') }}</td>
-                            <td class="px-5 py-3">
-                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-ink/5 text-ink/60">
-                                    {{ $i['category'] }}
-                                </span>
-                            </td>
-                            <td class="px-5 py-3 text-ink/70">{{ $i['description'] ?: '—' }}</td>
-                            <td class="px-5 py-3 tnum text-right font-medium text-emerald-700">+Rp {{ number_format($i['amount'], 0, ',', '.') }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        @endif
+        <input
+            id="incomes-search"
+            type="text"
+            value="{{ $search }}"
+            placeholder="Cari deskripsi pemasukan..."
+            autocomplete="off"
+            class="w-full rounded-xl border border-ink/12 pl-10 pr-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow"
+        >
     </div>
 
-    <div class="mt-4">
-        {{ $data->links() }}
+    {{-- Tabel per item, urut tanggal terbaru --}}
+    <div id="incomes-table-container">
+        @include('reports._incomes-table')
     </div>
 
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        window.initAjaxListSearch({
+            inputEl: document.getElementById('incomes-search'),
+            containerEl: document.getElementById('incomes-table-container'),
+            baseUrl: '{{ route('reports.incomes') }}',
+            getExtraParams: () => ({
+                start_date: '{{ $startDate }}',
+                end_date: '{{ $endDate }}',
+                category_id: '{{ $categoryId }}',
+            }),
+        });
+    });
+</script>
+@endpush

@@ -9,7 +9,7 @@
 >
     <div class="flex items-center justify-between mb-6">
         <div>
-            <p class="text-2xl font-display font-semibold tracking-tight">{{ $expenses->total() }}</p>
+            <p id="expense-total" class="text-2xl font-display font-semibold tracking-tight">{{ $expenses->total() }}</p>
             <p class="text-sm text-ink/50">catatan biaya</p>
         </div>
 
@@ -30,56 +30,23 @@
         <span x-text="flash"></span>
     </div>
 
-    @include('partials.date-range-filter', ['routeName' => 'expenses.index', 'dateLabel' => 'Tgl Pengeluaran'])
+    @include('partials.date-range-filter', ['routeName' => 'expenses.index', 'dateLabel' => 'Tgl Pengeluaran', 'extraParams' => ['search' => $search]])
 
-    <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead>
-                    <tr class="bg-ink/[0.03] text-left text-ink/50">
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Tanggal</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Kategori</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Keterangan</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Jumlah</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-ink/[0.06]">
-                    @forelse ($expenses as $expense)
-                        <tr class="hover:bg-amber-50/40 transition-colors">
-                            <td class="px-5 py-3.5 tnum text-ink/70">{{ $expense->expense_date->format('d M Y') }}</td>
-                            <td class="px-5 py-3.5">
-                                <span class="inline-flex items-center rounded-full bg-ink/[0.05] px-2.5 py-1 text-xs font-medium text-ink/70">
-                                    {{ $expense->category->name }}
-                                </span>
-                            </td>
-                            <td class="px-5 py-3.5 text-ink/50">{{ $expense->description ?? '—' }}</td>
-                            <td class="px-5 py-3.5 text-right tnum font-semibold text-red-700/90">Rp{{ number_format($expense->amount, 0, ',', '.') }}</td>
-                            <td class="px-5 py-3.5 text-right">
-                                @if (auth()->user()->isSuperadmin())
-                                    <button
-                                        @click="openEdit({{ Illuminate\Support\Js::from($expense) }})"
-                                        class="text-ink/60 hover:text-ink font-medium mr-3 transition-colors"
-                                    >Edit</button>
-                                    <button
-                                        @click="remove({{ $expense->id }})"
-                                        class="text-red-600/80 hover:text-red-700 font-medium transition-colors"
-                                    >Hapus</button>
-                                @endif
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="5" class="px-5 py-10 text-center text-ink/40">Belum ada catatan biaya.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+    {{-- Search: AJAX, tidak perlu tekan Enter, mencari di semua kolom yang tampil di tabel --}}
+    <div class="relative mb-4 max-w-sm">
+        <svg viewBox="0 0 24 24" class="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink/35" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="m21 21-4.3-4.3"/></svg>
+        <input
+            id="expense-search"
+            type="text"
+            value="{{ $search }}"
+            placeholder="Cari kategori, keterangan, jumlah..."
+            autocomplete="off"
+            class="w-full rounded-xl border border-ink/12 pl-10 pr-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow"
+        >
     </div>
 
-    <div class="mt-6">
-        {{ $expenses->links() }}
+    <div id="expense-table-container">
+        @include('expenses._table')
     </div>
 
     {{-- Modal Create/Edit --}}
@@ -259,5 +226,21 @@
             },
         };
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        window.initAjaxListSearch({
+            inputEl: document.getElementById('expense-search'),
+            containerEl: document.getElementById('expense-table-container'),
+            baseUrl: '{{ route('expenses.index') }}',
+            getExtraParams: () => ({
+                start_date: document.querySelector('input[name="start_date"]')?.value || '',
+                end_date: document.querySelector('input[name="end_date"]')?.value || '',
+            }),
+            onSwap: () => {
+                const total = document.querySelector('#expense-table-container [data-total]')?.dataset.total;
+                if (total !== undefined) document.getElementById('expense-total').textContent = total;
+            },
+        });
+    });
 </script>
 @endpush

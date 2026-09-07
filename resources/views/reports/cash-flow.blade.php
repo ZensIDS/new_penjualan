@@ -49,48 +49,28 @@
     {{-- Daftar transaksi. Diurutkan dari server (transaction_date DESC, lalu
          id DESC) supaya transaksi yang paling baru dicatat selalu tampil
          paling atas — termasuk saat beberapa transaksi terjadi di tanggal
-         yang sama. Dipaginasi 25/halaman, terpisah dari agregat KPI & grafik
-         di atas yang tetap menghitung semua transaksi pada periode ini. --}}
+         yang sama. Dipaginasi & bisa dicari (AJAX), terpisah dari agregat
+         KPI & grafik di atas yang tetap menghitung semua transaksi pada
+         periode ini. --}}
     <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
-        <div class="px-6 py-4 border-b border-ink/10">
+        <div class="px-6 py-4 border-b border-ink/10 flex items-center justify-between gap-3">
             <h2 class="font-display font-semibold">Rincian Transaksi</h2>
+            {{-- Search: AJAX, tidak perlu tekan Enter --}}
+            <div class="relative max-w-xs w-full">
+                <svg viewBox="0 0 24 24" class="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink/35" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="m21 21-4.3-4.3"/></svg>
+                <input
+                    id="cash-flow-search"
+                    type="text"
+                    value="{{ $search }}"
+                    placeholder="Cari keterangan..."
+                    autocomplete="off"
+                    class="w-full rounded-xl border border-ink/12 pl-10 pr-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow"
+                >
+            </div>
         </div>
-        @if ($details->isEmpty())
-            <p class="px-6 py-10 text-sm text-ink/40 text-center">Tidak ada transaksi kas pada periode ini.</p>
-        @else
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="text-left text-xs text-ink/40 uppercase tracking-wide border-b border-ink/[0.06]">
-                            <th class="px-6 py-3 font-medium">Tanggal</th>
-                            <th class="px-6 py-3 font-medium">Keterangan</th>
-                            <th class="px-6 py-3 font-medium">Arah</th>
-                            <th class="px-6 py-3 font-medium text-right">Jumlah</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-ink/[0.06]">
-                        @foreach ($details as $row)
-                            <tr>
-                                <td class="px-6 py-3 tnum whitespace-nowrap">{{ $row->transaction_date->format('d M Y') }}</td>
-                                <td class="px-6 py-3 text-ink/70">{{ $row->description }}</td>
-                                <td class="px-6 py-3">
-                                    <span class="text-xs font-medium rounded-full px-2.5 py-1
-                                        {{ $row->direction === 'in' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700' }}">
-                                        {{ $row->direction === 'in' ? 'Masuk' : 'Keluar' }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-3 text-right tnum font-medium {{ $row->direction === 'in' ? 'text-emerald-700' : 'text-red-700' }}">
-                                    {{ $row->direction === 'in' ? '+' : '-' }}Rp {{ number_format($row->amount, 0, ',', '.') }}
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-            <div class="px-6 py-4">
-                {{ $details->links() }}
-            </div>
-        @endif
+        <div id="cash-flow-table-container">
+            @include('reports._cash-flow-table')
+        </div>
     </div>
 
 @endsection
@@ -98,6 +78,18 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        window.initAjaxListSearch({
+            inputEl: document.getElementById('cash-flow-search'),
+            containerEl: document.getElementById('cash-flow-table-container'),
+            baseUrl: '{{ route('reports.cash-flow') }}',
+            getExtraParams: () => ({
+                start_date: '{{ $startDate }}',
+                end_date: '{{ $endDate }}',
+            }),
+        });
+    });
+
     document.addEventListener('DOMContentLoaded', function () {
         const el = document.getElementById('cashFlowChart');
         if (!el) return;

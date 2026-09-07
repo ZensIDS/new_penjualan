@@ -17,10 +17,20 @@ class IncomeController extends Controller
     {
         $startDate = $request->input('start_date');
         $endDate   = $request->input('end_date');
+        $search    = trim((string) $request->input('search', ''));
 
-        $incomes = Income::with('category')
+        $incomes = Income::query()
+            ->with('category:id,name') // hanya kolom yang dipakai di tabel
             ->when($startDate, fn($q) => $q->whereDate('income_date', '>=', $startDate))
             ->when($endDate, fn($q) => $q->whereDate('income_date', '<=', $endDate))
+            ->when($search !== '', function ($q) use ($search) {
+                // Cari di semua kolom yang tampil di tabel: Kategori, Keterangan, Jumlah.
+                $q->where(function ($q) use ($search) {
+                    $q->where('description', 'like', "%{$search}%")
+                        ->orWhere('amount', 'like', "%{$search}%")
+                        ->orWhereHas('category', fn($sq) => $sq->where('name', 'like', "%{$search}%"));
+                });
+            })
             ->latest('income_date')
             ->latest('id')
             ->paginate(10)
@@ -28,7 +38,11 @@ class IncomeController extends Controller
 
         $incomeCategories = IncomeCategory::orderBy('name')->get(['id', 'name', 'affects_profit_loss']);
 
-        return view('incomes.index', compact('incomes', 'incomeCategories', 'startDate', 'endDate'));
+        if ($request->ajax()) {
+            return view('incomes._table', compact('incomes'));
+        }
+
+        return view('incomes.index', compact('incomes', 'incomeCategories', 'startDate', 'endDate', 'search'));
     }
 
     public function store(StoreIncomeRequest $request)

@@ -370,9 +370,12 @@ class ReportService
      * Urutan sama seperti cashFlowReport(): transaction_date DESC, lalu id
      * DESC supaya transaksi yang baru dicatat selalu tampil paling atas.
      */
-    public function cashFlowDetailsPaginated(string $startDate, string $endDate, int $perPage = 25)
+    public function cashFlowDetailsPaginated(string $startDate, string $endDate, ?string $search = null, int $perPage = 25)
     {
+        $search = trim((string) $search);
+
         return CashFlow::whereBetween('transaction_date', [$startDate, $endDate])
+            ->when($search !== '', fn($q) => $q->where('description', 'like', "%{$search}%"))
             ->orderByDesc('transaction_date')
             ->orderByDesc('id')
             ->paginate($perPage)

@@ -9,7 +9,7 @@
 >
     <div class="flex items-center justify-between mb-6">
         <div>
-            <p class="text-2xl font-display font-semibold tracking-tight">{{ $customers->total() }}</p>
+            <p id="customer-total" class="text-2xl font-display font-semibold tracking-tight">{{ $customers->total() }}</p>
             <p class="text-sm text-ink/50">customer terdaftar</p>
         </div>
 
@@ -30,59 +30,23 @@
         <span x-text="flash"></span>
     </div>
 
-    @include('partials.date-range-filter', ['routeName' => 'customers.index', 'dateLabel' => 'Tgl Dibuat'])
+    @include('partials.date-range-filter', ['routeName' => 'customers.index', 'dateLabel' => 'Tgl Dibuat', 'extraParams' => ['search' => $search]])
 
-    <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead>
-                    <tr class="bg-ink/[0.03] text-left text-ink/50">
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Nama</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Telepon</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Email</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Tgl Dibuat</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-ink/[0.06]">
-                    @forelse ($customers as $customer)
-                        <tr class="hover:bg-amber-50/40 transition-colors">
-                            <td class="px-5 py-3.5">
-                                <div class="flex items-center gap-3">
-                                    <span class="h-8 w-8 rounded-full bg-ink text-white flex items-center justify-center text-xs font-semibold shrink-0">
-                                        {{ strtoupper(substr($customer->name, 0, 1)) }}
-                                    </span>
-                                    <span class="font-medium">{{ $customer->name }}</span>
-                                </div>
-                            </td>
-                            <td class="px-5 py-3.5 text-ink/60">{{ $customer->phone ?? '—' }}</td>
-                            <td class="px-5 py-3.5 text-ink/60">{{ $customer->email ?? '—' }}</td>
-                            <td class="px-5 py-3.5 text-ink/60 tnum">{{ $customer->created_at->format('d M Y') }}</td>
-                            <td class="px-5 py-3.5 text-right">
-                                @if (auth()->user()->isSuperadmin())
-                                    <button
-                                        @click="openEdit({{ Illuminate\Support\Js::from($customer) }})"
-                                        class="text-ink/60 hover:text-ink font-medium mr-3 transition-colors"
-                                    >Edit</button>
-                                    <button
-                                        @click="remove({{ $customer->id }})"
-                                        class="text-red-600/80 hover:text-red-700 font-medium transition-colors"
-                                    >Hapus</button>
-                                @endif
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="5" class="px-5 py-10 text-center text-ink/40">Belum ada customer.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+    {{-- Search: AJAX, tidak perlu tekan Enter, mencari di semua kolom yang tampil di tabel --}}
+    <div class="relative mb-4 max-w-sm">
+        <svg viewBox="0 0 24 24" class="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink/35" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="m21 21-4.3-4.3"/></svg>
+        <input
+            id="customer-search"
+            type="text"
+            value="{{ $search }}"
+            placeholder="Cari nama, telepon, email..."
+            autocomplete="off"
+            class="w-full rounded-xl border border-ink/12 pl-10 pr-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow"
+        >
     </div>
 
-    <div class="mt-6">
-        {{ $customers->links() }}
+    <div id="customer-table-container">
+        @include('customers._table')
     </div>
 
     {{-- Modal Create/Edit --}}
@@ -228,5 +192,21 @@
             },
         };
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        window.initAjaxListSearch({
+            inputEl: document.getElementById('customer-search'),
+            containerEl: document.getElementById('customer-table-container'),
+            baseUrl: '{{ route('customers.index') }}',
+            getExtraParams: () => ({
+                start_date: document.querySelector('input[name="start_date"]')?.value || '',
+                end_date: document.querySelector('input[name="end_date"]')?.value || '',
+            }),
+            onSwap: () => {
+                const total = document.querySelector('#customer-table-container [data-total]')?.dataset.total;
+                if (total !== undefined) document.getElementById('customer-total').textContent = total;
+            },
+        });
+    });
 </script>
 @endpush

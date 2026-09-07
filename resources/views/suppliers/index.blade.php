@@ -9,7 +9,7 @@
 >
     <div class="flex items-center justify-between mb-6">
         <div>
-            <p class="text-2xl font-display font-semibold tracking-tight">{{ $suppliers->total() }}</p>
+            <p id="supplier-total" class="text-2xl font-display font-semibold tracking-tight">{{ $suppliers->total() }}</p>
             <p class="text-sm text-ink/50">supplier terdaftar</p>
         </div>
 
@@ -30,54 +30,23 @@
         <span x-text="flash"></span>
     </div>
 
-    @include('partials.date-range-filter', ['routeName' => 'suppliers.index', 'dateLabel' => 'Tgl Dibuat'])
+    @include('partials.date-range-filter', ['routeName' => 'suppliers.index', 'dateLabel' => 'Tgl Dibuat', 'extraParams' => ['search' => $search]])
 
-    <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead>
-                    <tr class="bg-ink/[0.03] text-left text-ink/50">
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Nama</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Kontak</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Telepon</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Email</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Tgl Dibuat</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-ink/[0.06]">
-                    @forelse ($suppliers as $supplier)
-                        <tr class="hover:bg-amber-50/40 transition-colors">
-                            <td class="px-5 py-3.5 font-medium">{{ $supplier->name }}</td>
-                            <td class="px-5 py-3.5 text-ink/60">{{ $supplier->contact_person ?? '—' }}</td>
-                            <td class="px-5 py-3.5 text-ink/60">{{ $supplier->phone ?? '—' }}</td>
-                            <td class="px-5 py-3.5 text-ink/60">{{ $supplier->email ?? '—' }}</td>
-                            <td class="px-5 py-3.5 text-ink/60 tnum">{{ $supplier->created_at->format('d M Y') }}</td>
-                            <td class="px-5 py-3.5 text-right">
-                                @if (auth()->user()->isSuperadmin())
-                                    <button
-                                        @click="openEdit({{ Illuminate\Support\Js::from($supplier) }})"
-                                        class="text-ink/60 hover:text-ink font-medium mr-3 transition-colors"
-                                    >Edit</button>
-                                    <button
-                                        @click="remove({{ $supplier->id }})"
-                                        class="text-red-600/80 hover:text-red-700 font-medium transition-colors"
-                                    >Hapus</button>
-                                @endif
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="px-5 py-10 text-center text-ink/40">Belum ada supplier.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+    {{-- Search: AJAX, tidak perlu tekan Enter, mencari di semua kolom yang tampil di tabel --}}
+    <div class="relative mb-4 max-w-sm">
+        <svg viewBox="0 0 24 24" class="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink/35" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="m21 21-4.3-4.3"/></svg>
+        <input
+            id="supplier-search"
+            type="text"
+            value="{{ $search }}"
+            placeholder="Cari nama, kontak, telepon, email..."
+            autocomplete="off"
+            class="w-full rounded-xl border border-ink/12 pl-10 pr-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow"
+        >
     </div>
 
-    <div class="mt-6">
-        {{ $suppliers->links() }}
+    <div id="supplier-table-container">
+        @include('suppliers._table')
     </div>
 
     {{-- Modal Create/Edit --}}
@@ -231,5 +200,21 @@
             },
         };
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        window.initAjaxListSearch({
+            inputEl: document.getElementById('supplier-search'),
+            containerEl: document.getElementById('supplier-table-container'),
+            baseUrl: '{{ route('suppliers.index') }}',
+            getExtraParams: () => ({
+                start_date: document.querySelector('input[name="start_date"]')?.value || '',
+                end_date: document.querySelector('input[name="end_date"]')?.value || '',
+            }),
+            onSwap: () => {
+                const total = document.querySelector('#supplier-table-container [data-total]')?.dataset.total;
+                if (total !== undefined) document.getElementById('supplier-total').textContent = total;
+            },
+        });
+    });
 </script>
 @endpush

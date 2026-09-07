@@ -17,10 +17,20 @@ class ExpenseController extends Controller
     {
         $startDate = $request->input('start_date');
         $endDate   = $request->input('end_date');
+        $search    = trim((string) $request->input('search', ''));
 
-        $expenses = Expense::with('category')
+        $expenses = Expense::query()
+            ->with('category:id,name') // hanya kolom yang dipakai di tabel
             ->when($startDate, fn($q) => $q->whereDate('expense_date', '>=', $startDate))
             ->when($endDate, fn($q) => $q->whereDate('expense_date', '<=', $endDate))
+            ->when($search !== '', function ($q) use ($search) {
+                // Cari di semua kolom yang tampil di tabel: Kategori, Keterangan, Jumlah.
+                $q->where(function ($q) use ($search) {
+                    $q->where('description', 'like', "%{$search}%")
+                        ->orWhere('amount', 'like', "%{$search}%")
+                        ->orWhereHas('category', fn($sq) => $sq->where('name', 'like', "%{$search}%"));
+                });
+            })
             ->latest('expense_date')
             ->latest('id')
             ->paginate(10)
@@ -28,7 +38,11 @@ class ExpenseController extends Controller
 
         $expenseCategories = ExpenseCategory::orderBy('name')->get(['id', 'name']);
 
-        return view('expenses.index', compact('expenses', 'expenseCategories', 'startDate', 'endDate'));
+        if ($request->ajax()) {
+            return view('expenses._table', compact('expenses'));
+        }
+
+        return view('expenses.index', compact('expenses', 'expenseCategories', 'startDate', 'endDate', 'search'));
     }
 
     public function store(StoreExpenseRequest $request)

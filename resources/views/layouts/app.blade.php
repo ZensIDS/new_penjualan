@@ -137,6 +137,78 @@
             const digits = String(formatted ?? '').replace(/[^0-9]/g, '');
             return digits ? parseInt(digits, 10) : '';
         };
+
+        // Helper AJAX search untuk halaman listing (PO, SO, Expenses, Incomes, dst).
+        // Query dikirim ke server (bukan filter di JS), di-debounce supaya tidak
+        // nembak request tiap ketikan, dan request lama di-abort kalau ada request
+        // baru menyusul (mencegah race condition/response basi menimpa yang baru).
+        //
+        // opts:
+        // - inputEl       : elemen <input> pencarian
+        // - containerEl   : elemen wrapper yang isinya (tabel + pagination) diganti via AJAX
+        // - baseUrl       : URL index halaman ini (route(...).index)
+        // - getExtraParams: fungsi opsional yang mengembalikan object query tambahan
+        //                   (mis. start_date/end_date dari form filter tanggal)
+        // - onSwap        : callback opsional dipanggil tiap kali containerEl diganti isinya
+        // - delay         : debounce delay ms (default 400)
+        window.initAjaxListSearch = function ({ inputEl, containerEl, baseUrl, getExtraParams, onSwap, delay = 400 }) {
+            let debounceTimer = null;
+            let controller = null;
+
+            async function fetchAndSwap(url) {
+                if (controller) controller.abort();
+                controller = new AbortController();
+
+                containerEl.classList.add('opacity-50', 'pointer-events-none');
+
+                try {
+                    const res = await fetch(url, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                        signal: controller.signal,
+                    });
+                    if (!res.ok) throw new Error('Request gagal');
+                    const html = await res.text();
+
+                    containerEl.innerHTML = html;
+                    // Elemen baru hasil swap perlu diinisialisasi ulang oleh Alpine
+                    // (misal tombol Edit/Hapus yang pakai @click di dalam tabel).
+                    if (window.Alpine && typeof window.Alpine.initTree === 'function') {
+                        window.Alpine.initTree(containerEl);
+                    }
+
+                    window.history.replaceState({}, '', url);
+                    if (onSwap) onSwap();
+                } catch (e) {
+                    if (e.name !== 'AbortError') console.error(e);
+                } finally {
+                    containerEl.classList.remove('opacity-50', 'pointer-events-none');
+                }
+            }
+
+            function buildUrl(extraQuery = {}) {
+                const params = new URLSearchParams(getExtraParams ? getExtraParams() : {});
+                params.set('search', inputEl.value.trim());
+                Object.entries(extraQuery).forEach(([k, v]) => params.set(k, v));
+                return `${baseUrl}?${params.toString()}`;
+            }
+
+            inputEl.addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => fetchAndSwap(buildUrl()), delay);
+            });
+
+            // Klik link pagination di dalam containerEl (elemen .ajax-pagination)
+            // ikut lewat AJAX juga, supaya tidak reload full page & tetap bawa
+            // search + filter tanggal yang sedang aktif.
+            containerEl.addEventListener('click', (e) => {
+                const link = e.target.closest('.ajax-pagination a');
+                if (!link) return;
+                e.preventDefault();
+                fetchAndSwap(link.href);
+            });
+
+            return { fetchAndSwap, buildUrl };
+        };
     </script>
 
     @stack('styles')

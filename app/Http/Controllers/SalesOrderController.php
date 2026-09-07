@@ -23,16 +23,52 @@ class SalesOrderController extends Controller
     {
         $startDate = $request->input('start_date');
         $endDate   = $request->input('end_date');
+        $search    = trim((string) $request->input('search', ''));
 
-        $salesOrders = SalesOrder::with('customer')
+        $salesOrders = SalesOrder::query()
+            ->with(['customer:id,name', 'source:id,name']) // hanya kolom yang dipakai di tabel
             ->when($startDate, fn($q) => $q->whereDate('so_date', '>=', $startDate))
             ->when($endDate, fn($q) => $q->whereDate('so_date', '<=', $endDate))
+            ->when($search !== '', function ($q) use ($search) {
+                // Cari di semua kolom yang tampil di tabel: No. SO, Customer, Status,
+                // serta Total/Sisa Piutang (dicocokkan sebagai teks angka).
+                $q->where(function ($q) use ($search) {
+                    $q->where('so_number', 'like', "%{$search}%")
+                        ->orWhere('note', 'like', "%{$search}%")
+                        ->orWhereHas('customer', fn($sq) => $sq->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('source', fn($sq) => $sq->where('name', 'like', "%{$search}%"))
+                        ->orWhere('total_amount', 'like', "%{$search}%")
+                        ->orWhereRaw('(total_amount - paid_amount) LIKE ?', ["%{$search}%"])
+                        ->orWhere('payment_status', $this->mapStatusSearch($search));
+                });
+            })
             ->latest('so_date')
             ->latest('id')
             ->paginate(10)
             ->withQueryString();
 
-        return view('sales-orders.index', compact('salesOrders', 'startDate', 'endDate'));
+        if ($request->ajax()) {
+            return view('sales-orders._table', compact('salesOrders'));
+        }
+
+        return view('sales-orders.index', compact('salesOrders', 'startDate', 'endDate', 'search'));
+    }
+
+    /**
+     * Terjemahkan kata kunci pencarian ala label status ("lunas", "sebagian",
+     * "belum bayar") ke nilai enum payment_status di DB, supaya user bisa cari
+     * pakai label yang tampil di tabel, bukan cuma nilai mentahnya.
+     */
+    protected function mapStatusSearch(string $search): string
+    {
+        $search = strtolower($search);
+
+        return match (true) {
+            str_contains($search, 'lunas')  => 'paid',
+            str_contains($search, 'sebagian') => 'partial',
+            str_contains($search, 'belum')  => 'unpaid',
+            default => $search,
+        };
     }
 
     protected function productsForForm(): \Illuminate\Support\Collection
