@@ -8,6 +8,7 @@ use App\Models\Income;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
+use App\Models\ProfitShare;
 use App\Models\PurchaseReturn;
 use App\Models\SaleItem;
 use App\Models\SalesOrder;
@@ -178,6 +179,25 @@ class ReportService
 
         $netProfit = $grossProfit - $operationalExpense + $otherIncome;
 
+        // Bagi Hasil: pembagian Laba Bersih ke tiap orang di master Bagi Hasil,
+        // berdasar persentase masing-masing (hanya yang aktif). Ini murni
+        // ALOKASI dari Laba Bersih yang sudah dihitung di atas — tidak
+        // mengubah nilai Laba Bersih itu sendiri.
+        $profitShares = ProfitShare::where('is_active', true)
+            ->orderByDesc('percentage')
+            ->get(['id', 'name', 'percentage'])
+            ->map(function ($share) use ($netProfit) {
+                return [
+                    'id'         => $share->id,
+                    'name'       => $share->name,
+                    'percentage' => (float) $share->percentage,
+                    'amount'     => $netProfit > 0 ? round($netProfit * ((float) $share->percentage / 100), 2) : 0.0,
+                ];
+            });
+
+        $totalProfitSharePercentage = (float) ProfitShare::where('is_active', true)->sum('percentage');
+        $totalProfitShareAmount = (float) $profitShares->sum('amount');
+
         $expenseByCategory = Expense::whereBetween('expense_date', [$startDate, $endDate])
             ->join('expense_categories', 'expenses.expense_category_id', '=', 'expense_categories.id')
             ->select('expense_categories.name', DB::raw('SUM(expenses.amount) as total'))
@@ -237,6 +257,10 @@ class ReportService
             'non_profit_loss_income'              => (float) $nonProfitLossIncome,
             'non_profit_loss_income_by_category'  => $nonProfitLossIncomeByCategory,
             'net_profit'             => (float) $netProfit,
+            'profit_shares'                    => $profitShares,
+            'total_profit_share_percentage'    => $totalProfitSharePercentage,
+            'total_profit_share_amount'        => $totalProfitShareAmount,
+            'net_profit_unallocated'           => (float) $netProfit - $totalProfitShareAmount,
             'sales_return'           => (float) $salesReturnAmount,
             'sales_return_hpp'       => (float) $salesReturnHpp,
             'purchase'               => (float) $purchaseAmount,

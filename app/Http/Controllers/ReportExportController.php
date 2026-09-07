@@ -147,6 +147,7 @@ class ReportExportController extends Controller
             ['label' => 'Biaya Operasional', 'value' => -$data['operational_expense'], 'format' => ExcelStyler::FMT_RP],
             ['label' => 'Pemasukan Lain (masuk laba)', 'value' => $data['other_income'], 'format' => ExcelStyler::FMT_RP],
             ['label' => 'Laba Bersih', 'value' => $data['net_profit'], 'format' => ExcelStyler::FMT_RP, 'highlight' => true],
+            ['label' => 'Bagi Hasil (' . number_format($data['total_profit_share_percentage'], 2, ',', '.') . '%) - info, alokasi dari Laba Bersih', 'value' => $data['total_profit_share_amount'], 'format' => ExcelStyler::FMT_RP],
             ['label' => 'Pemasukan Permodalan/Pendanaan - info, tidak dihitung sebagai laba', 'value' => $data['non_profit_loss_income'], 'format' => ExcelStyler::FMT_RP],
             ['label' => 'Total Pembelian (PO) - info, belum jadi HPP (masih stok)', 'value' => $data['purchase'], 'format' => ExcelStyler::FMT_RP],
             ['label' => 'Retur Pembelian (PO) - info, tidak memengaruhi laba', 'value' => $data['purchase_return'], 'format' => ExcelStyler::FMT_RP],
@@ -179,6 +180,23 @@ class ReportExportController extends Controller
             $sheet->setCellValue("A{$incomeTableStart}", 'Tidak ada pemasukan lain pada periode ini.');
         } else {
             ExcelStyler::totalsRow($sheet, $row, ['Total', $data['other_income']], currencyCols: [2]);
+        }
+        $row++;
+
+        $row = ExcelStyler::sectionTitle($sheet, $row, 'Bagi Hasil per Orang', $colSpan);
+        $row = ExcelStyler::header($sheet, $row, ['Nama (Persentase)', 'Jumlah']);
+
+        $profitShareRows = $data['profit_shares']->map(
+            fn($s) => [$s['name'] . ' (' . number_format($s['percentage'], 2, ',', '.') . '%)', (float) $s['amount']]
+        );
+        $shareTableStart = $row;
+        $row = ExcelStyler::rows($sheet, $row, $profitShareRows, currencyCols: [2]);
+
+        if ($profitShareRows->isEmpty()) {
+            $sheet->mergeCells("A{$shareTableStart}:B{$shareTableStart}");
+            $sheet->setCellValue("A{$shareTableStart}", 'Belum ada data di master Bagi Hasil.');
+        } else {
+            ExcelStyler::totalsRow($sheet, $row, ['Total', $data['total_profit_share_amount']], currencyCols: [2]);
         }
 
         ExcelStyler::setColumnWidths($sheet, [42, 22]);

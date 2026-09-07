@@ -182,6 +182,29 @@
                         Rp {{ number_format($profitLoss['net_profit'], 0, ',', '.') }}
                     </span>
                 </div>
+
+                {{-- Bagi Hasil: alokasi Laba Bersih per orang, berdasar persentase di master Bagi Hasil. --}}
+                <div class="px-6 py-3.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-ink/60">
+                            <a href="{{ route('profit-shares.index') }}" class="hover:text-amber-700 underline decoration-dotted underline-offset-2">Bagi Hasil</a>
+                            <span class="text-xs text-ink/35">({{ number_format($profitLoss['total_profit_share_percentage'], 2, ',', '.') }}%)</span>
+                        </span>
+                        <span class="tnum text-amber-700">Rp {{ number_format($profitLoss['total_profit_share_amount'], 0, ',', '.') }}</span>
+                    </div>
+                    @if ($profitLoss['profit_shares']->isNotEmpty())
+                        <div class="mt-2 space-y-1 pl-3 border-l-2 border-ink/10">
+                            @foreach ($profitLoss['profit_shares'] as $share)
+                                <div class="flex items-center justify-between text-xs text-ink">
+                                    <span>{{ $share['name'] }} <span class="text-ink/30">({{ number_format($share['percentage'], 2, ',', '.') }}%)</span></span>
+                                    <span class="tnum">Rp {{ number_format($share['amount'], 0, ',', '.') }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <p class="text-xs text-ink/35 mt-1.5">Belum ada data di master Bagi Hasil.</p>
+                    @endif
+                </div>
             </div>
 
             {{-- Info tambahan, di luar alur laba rugi (belum memengaruhi laba) --}}

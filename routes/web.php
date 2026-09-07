@@ -9,6 +9,7 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\IncomeCategoryController;
 use App\Http\Controllers\IncomeController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProfitShareController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchaseReturnController;
 use App\Http\Controllers\ReportController;
@@ -75,6 +76,7 @@ Route::middleware('auth')->group(function () {
     Route::get('expense-categories', [ExpenseCategoryController::class, 'index'])->name('expense-categories.index');
     Route::get('incomes', [IncomeController::class, 'index'])->name('incomes.index');
     Route::get('income-categories', [IncomeCategoryController::class, 'index'])->name('income-categories.index');
+    Route::get('profit-shares', [ProfitShareController::class, 'index'])->name('profit-shares.index');
 
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('stock', [ReportController::class, 'stock'])->name('stock');
@@ -163,5 +165,8 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
         ->only(['store', 'update', 'destroy']);
 
     Route::resource('income-categories', IncomeCategoryController::class)
+        ->only(['store', 'update', 'destroy']);
+
+    Route::resource('profit-shares', ProfitShareController::class)
         ->only(['store', 'update', 'destroy']);
 });
