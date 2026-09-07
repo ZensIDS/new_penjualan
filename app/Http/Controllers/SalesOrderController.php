@@ -13,19 +13,26 @@ use App\Models\SalesOrder;
 use App\Models\SalesPayment;
 use App\Models\StockBatch;
 use App\Services\SalesOrderService;
+use Illuminate\Http\Request;
 
 class SalesOrderController extends Controller
 {
     public function __construct(protected SalesOrderService $service) {}
 
-    public function index()
+    public function index(Request $request)
     {
+        $startDate = $request->input('start_date');
+        $endDate   = $request->input('end_date');
+
         $salesOrders = SalesOrder::with('customer')
+            ->when($startDate, fn($q) => $q->whereDate('so_date', '>=', $startDate))
+            ->when($endDate, fn($q) => $q->whereDate('so_date', '<=', $endDate))
             ->latest('so_date')
             ->latest('id')
-            ->paginate(10);
+            ->paginate(10)
+            ->withQueryString();
 
-        return view('sales-orders.index', compact('salesOrders'));
+        return view('sales-orders.index', compact('salesOrders', 'startDate', 'endDate'));
     }
 
     protected function productsForForm(): \Illuminate\Support\Collection

@@ -7,21 +7,28 @@ use App\Http\Requests\UpdateIncomeRequest;
 use App\Models\Income;
 use App\Models\IncomeCategory;
 use App\Services\IncomeService;
+use Illuminate\Http\Request;
 
 class IncomeController extends Controller
 {
     public function __construct(protected IncomeService $service) {}
 
-    public function index()
+    public function index(Request $request)
     {
+        $startDate = $request->input('start_date');
+        $endDate   = $request->input('end_date');
+
         $incomes = Income::with('category')
+            ->when($startDate, fn($q) => $q->whereDate('income_date', '>=', $startDate))
+            ->when($endDate, fn($q) => $q->whereDate('income_date', '<=', $endDate))
             ->latest('income_date')
             ->latest('id')
-            ->paginate(10);
+            ->paginate(10)
+            ->withQueryString();
 
         $incomeCategories = IncomeCategory::orderBy('name')->get(['id', 'name', 'affects_profit_loss']);
 
-        return view('incomes.index', compact('incomes', 'incomeCategories'));
+        return view('incomes.index', compact('incomes', 'incomeCategories', 'startDate', 'endDate'));
     }
 
     public function store(StoreIncomeRequest $request)

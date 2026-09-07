@@ -30,6 +30,8 @@
         <span x-text="flash"></span>
     </div>
 
+    @include('partials.date-range-filter', ['routeName' => 'expenses.index', 'dateLabel' => 'Tgl Pengeluaran'])
+
     <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
@@ -45,7 +47,7 @@
                 <tbody class="divide-y divide-ink/[0.06]">
                     @forelse ($expenses as $expense)
                         <tr class="hover:bg-amber-50/40 transition-colors">
-                            <td class="px-5 py-3.5 tnum text-ink/70">{{ $expense->expense_date->format('d/m/Y') }}</td>
+                            <td class="px-5 py-3.5 tnum text-ink/70">{{ $expense->expense_date->format('d M Y') }}</td>
                             <td class="px-5 py-3.5">
                                 <span class="inline-flex items-center rounded-full bg-ink/[0.05] px-2.5 py-1 text-xs font-medium text-ink/70">
                                     {{ $expense->category->name }}

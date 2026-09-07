@@ -44,9 +44,9 @@
         </form>
         <p class="text-xs text-ink/40 mt-3">
             Menampilkan data periode
-            <span class="font-medium text-ink/60">{{ \Illuminate\Support\Carbon::parse($startDate)->translatedFormat('d M Y') }}</span>
+            <span class="font-medium text-ink/60">{{ \Illuminate\Support\Carbon::parse($startDate)->format('d M Y') }}</span>
             &ndash;
-            <span class="font-medium text-ink/60">{{ \Illuminate\Support\Carbon::parse($endDate)->translatedFormat('d M Y') }}</span>
+            <span class="font-medium text-ink/60">{{ \Illuminate\Support\Carbon::parse($endDate)->format('d M Y') }}</span>
         </p>
     </div>
 

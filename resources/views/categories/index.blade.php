@@ -30,6 +30,8 @@
         <span x-text="flash"></span>
     </div>
 
+    @include('partials.date-range-filter', ['routeName' => 'categories.index', 'dateLabel' => 'Tgl Dibuat'])
+
     <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
@@ -37,6 +39,7 @@
                     <tr class="bg-ink/[0.03] text-left text-ink/50">
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Nama</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Slug</th>
+                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Tgl Dibuat</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Jml Produk</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Aksi</th>
                     </tr>
@@ -46,6 +49,7 @@
                         <tr class="hover:bg-amber-50/40 transition-colors">
                             <td class="px-5 py-3.5 font-medium">{{ $category->name }}</td>
                             <td class="px-5 py-3.5 text-ink/50">{{ $category->slug }}</td>
+                            <td class="px-5 py-3.5 tnum">{{ $category->created_at->format('d M Y') }}</td>
                             <td class="px-5 py-3.5 tnum">
                                 <span class="inline-flex items-center rounded-full bg-ink/[0.05] px-2.5 py-1 text-xs font-semibold text-ink/70">
                                     {{ $category->products_count }}
@@ -66,7 +70,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="px-5 py-10 text-center text-ink/40">Belum ada kategori.</td>
+                            <td colspan="5" class="px-5 py-10 text-center text-ink/40">Belum ada kategori.</td>
                         </tr>
                     @endforelse
                 </tbody>

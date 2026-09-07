@@ -21,6 +21,8 @@
         @endif
     </div>
 
+    @include('partials.date-range-filter', ['routeName' => 'sales-orders.index', 'dateLabel' => 'Tgl SO'])
+
     <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
@@ -39,7 +41,7 @@
                     @forelse ($salesOrders as $so)
                         <tr class="hover:bg-amber-50/40 transition-colors">
                             <td class="px-5 py-3.5 font-medium tnum">{{ $so->so_number }}</td>
-                            <td class="px-5 py-3.5 text-ink/60 tnum">{{ $so->so_date->translatedFormat('d M Y') }}</td>
+                            <td class="px-5 py-3.5 text-ink/60 tnum">{{ $so->so_date->format('d M Y') }}</td>
                             <td class="px-5 py-3.5">{{ $so->customer->name ?? 'Customer umum' }}</td>
                             <td class="px-5 py-3.5 text-right tnum">Rp {{ number_format($so->total_amount, 0, ',', '.') }}</td>
                             <td class="px-5 py-3.5 text-right tnum {{ $so->remaining_balance > 0 ? 'text-red-700 font-medium' : 'text-ink/40' }}">

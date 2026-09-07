@@ -34,7 +34,7 @@
                 </span>
             </div>
             <p class="text-sm text-ink/50">
-                {{ $salesOrder->so_date->translatedFormat('d F Y') }} &middot; {{ $salesOrder->customer->name ?? 'Customer umum' }}
+                {{ $salesOrder->so_date->format('d M Y') }} &middot; {{ $salesOrder->customer->name ?? 'Customer umum' }}
             </p>
         </div>
 
@@ -108,7 +108,7 @@
                                                         <p class="text-xs text-ink/60 tnum">
                                                             Batch #{{ $alloc->stock_batch_id }}
                                                             @if ($alloc->stockBatch)
-                                                                ({{ $alloc->stockBatch->batch_date->translatedFormat('d M Y') }})
+                                                                ({{ $alloc->stockBatch->batch_date->format('d M Y') }})
                                                             @endif
                                                             &mdash; {{ $alloc->qty_taken }} unit
                                                             &times; Rp {{ number_format($alloc->buy_price_at_time, 0, ',', '.') }}
@@ -172,7 +172,7 @@
                                     </div>
                                 </div>
                                 <p class="text-xs text-ink/40 mt-0.5">
-                                    {{ $return->return_date->translatedFormat('d M Y') }}
+                                    {{ $return->return_date->format('d M Y') }}
                                     @if ($return->note) &middot; {{ $return->note }} @endif
                                 </p>
                                 <ul class="mt-2 space-y-0.5 text-xs text-ink/60">
@@ -256,7 +256,7 @@
                                     <div>
                                         <p class="font-medium">Rp {{ number_format($payment->amount, 0, ',', '.') }}</p>
                                         <p class="text-xs text-ink/40">
-                                            {{ $payment->payment_date->translatedFormat('d M Y') }} &middot;
+                                            {{ $payment->payment_date->format('d M Y') }} &middot;
                                             {{ ['cash' => 'Tunai', 'transfer' => 'Transfer', 'other' => 'Lainnya'][$payment->method] ?? $payment->method }}
                                             @if ($payment->note) &middot; {{ $payment->note }} @endif
                                         </p>

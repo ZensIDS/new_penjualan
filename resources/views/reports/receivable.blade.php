@@ -44,7 +44,7 @@
                         </svg>
                         <div class="min-w-0">
                             <p class="font-medium truncate">{{ $so['so_number'] }}</p>
-                            <p class="text-xs text-ink/40">{{ $so['customer'] }} &middot; {{ $so['so_date'] }}</p>
+                            <p class="text-xs text-ink/40">{{ $so['customer'] }} &middot; {{ \Illuminate\Support\Carbon::parse($so['so_date'])->format('d M Y') }}</p>
                         </div>
                     </div>
                     <div class="flex items-center gap-4 sm:gap-6 shrink-0">
@@ -76,7 +76,7 @@
                             <tbody class="divide-y divide-ink/[0.05]">
                                 @foreach ($so['payment_history'] as $pmt)
                                     <tr>
-                                        <td class="py-1.5 tnum">{{ $pmt['payment_date'] }}</td>
+                                        <td class="py-1.5 tnum">{{ \Illuminate\Support\Carbon::parse($pmt['payment_date'])->format('d M Y') }}</td>
                                         <td class="py-1.5">{{ $pmt['method'] }}</td>
                                         <td class="py-1.5 tnum text-right font-medium">Rp {{ number_format($pmt['amount'], 0, ',', '.') }}</td>
                                     </tr>

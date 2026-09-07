@@ -62,9 +62,9 @@
         </form>
         <p class="text-xs text-ink/40 mt-3">
             Menampilkan data periode
-            <span class="font-medium text-ink/60">{{ \Illuminate\Support\Carbon::parse($startDate)->translatedFormat('d M Y') }}</span>
+            <span class="font-medium text-ink/60">{{ \Illuminate\Support\Carbon::parse($startDate)->format('d M Y') }}</span>
             &ndash;
-            <span class="font-medium text-ink/60">{{ \Illuminate\Support\Carbon::parse($endDate)->translatedFormat('d M Y') }}</span>
+            <span class="font-medium text-ink/60">{{ \Illuminate\Support\Carbon::parse($endDate)->format('d M Y') }}</span>
             @if ($categoryId)
                 &middot; Kategori:
                 <span class="font-medium text-ink/60">{{ $categories->firstWhere('id', $categoryId)->name ?? '—' }}</span>
@@ -120,7 +120,7 @@
                 <tbody class="divide-y divide-ink/[0.06]">
                     @foreach ($data as $e)
                         <tr class="hover:bg-amber-50/30 transition-colors">
-                            <td class="px-5 py-3 tnum whitespace-nowrap">{{ \Illuminate\Support\Carbon::parse($e['expense_date'])->translatedFormat('d M Y') }}</td>
+                            <td class="px-5 py-3 tnum whitespace-nowrap">{{ \Illuminate\Support\Carbon::parse($e['expense_date'])->format('d M Y') }}</td>
                             <td class="px-5 py-3">
                                 <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-ink/5 text-ink/60">
                                     {{ $e['category'] }}

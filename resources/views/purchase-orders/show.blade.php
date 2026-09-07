@@ -31,7 +31,7 @@
                 </span>
             </div>
             <p class="text-sm text-ink/50">
-                {{ $purchaseOrder->po_date->translatedFormat('d F Y') }} &middot; {{ $purchaseOrder->supplier->name }}
+                {{ $purchaseOrder->po_date->format('d M Y') }} &middot; {{ $purchaseOrder->supplier->name }}
             </p>
         </div>
 
@@ -140,7 +140,7 @@
                                     </div>
                                 </div>
                                 <p class="text-xs text-ink/40 mt-0.5">
-                                    {{ $return->return_date->translatedFormat('d M Y') }}
+                                    {{ $return->return_date->format('d M Y') }}
                                     @if ($return->note) &middot; {{ $return->note }} @endif
                                 </p>
                                 <ul class="mt-2 space-y-0.5 text-xs text-ink/60">
@@ -224,7 +224,7 @@
                                     <div>
                                         <p class="font-medium">Rp {{ number_format($payment->amount, 0, ',', '.') }}</p>
                                         <p class="text-xs text-ink/40">
-                                            {{ $payment->payment_date->translatedFormat('d M Y') }} &middot;
+                                            {{ $payment->payment_date->format('d M Y') }} &middot;
                                             {{ ['cash' => 'Tunai', 'transfer' => 'Transfer', 'other' => 'Lainnya'][$payment->method] ?? $payment->method }}
                                             @if ($payment->note) &middot; {{ $payment->note }} @endif
                                         </p>

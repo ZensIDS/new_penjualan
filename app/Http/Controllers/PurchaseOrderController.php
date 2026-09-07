@@ -12,19 +12,26 @@ use App\Models\PurchasePayment;
 use App\Models\Supplier;
 use App\Services\PurchaseOrderService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class PurchaseOrderController extends Controller
 {
     public function __construct(protected PurchaseOrderService $service) {}
 
-    public function index()
+    public function index(Request $request)
     {
+        $startDate = $request->input('start_date');
+        $endDate   = $request->input('end_date');
+
         $purchaseOrders = PurchaseOrder::with('supplier')
+            ->when($startDate, fn($q) => $q->whereDate('po_date', '>=', $startDate))
+            ->when($endDate, fn($q) => $q->whereDate('po_date', '<=', $endDate))
             ->latest('po_date')
             ->latest('id')
-            ->paginate(10);
+            ->paginate(10)
+            ->withQueryString();
 
-        return view('purchase-orders.index', compact('purchaseOrders'));
+        return view('purchase-orders.index', compact('purchaseOrders', 'startDate', 'endDate'));
         // Kalau API: return response()->json($purchaseOrders);
     }
 

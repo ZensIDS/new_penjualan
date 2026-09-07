@@ -5,16 +5,23 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreIncomeCategoryRequest;
 use App\Http\Requests\UpdateIncomeCategoryRequest;
 use App\Models\IncomeCategory;
+use Illuminate\Http\Request;
 
 class IncomeCategoryController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $incomeCategories = IncomeCategory::withCount('incomes')
-            ->latest()
-            ->paginate(10);
+        $startDate = $request->input('start_date');
+        $endDate   = $request->input('end_date');
 
-        return view('income-categories.index', compact('incomeCategories'));
+        $incomeCategories = IncomeCategory::withCount('incomes')
+            ->when($startDate, fn($q) => $q->whereDate('created_at', '>=', $startDate))
+            ->when($endDate, fn($q) => $q->whereDate('created_at', '<=', $endDate))
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
+
+        return view('income-categories.index', compact('incomeCategories', 'startDate', 'endDate'));
     }
 
     public function store(StoreIncomeCategoryRequest $request)

@@ -5,16 +5,23 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreSaleSourceRequest;
 use App\Http\Requests\UpdateSaleSourceRequest;
 use App\Models\SaleSource;
+use Illuminate\Http\Request;
 
 class SaleSourceController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $saleSources = SaleSource::withCount('salesOrders')
-            ->latest()
-            ->paginate(10);
+        $startDate = $request->input('start_date');
+        $endDate   = $request->input('end_date');
 
-        return view('sale-sources.index', compact('saleSources'));
+        $saleSources = SaleSource::withCount('salesOrders')
+            ->when($startDate, fn($q) => $q->whereDate('created_at', '>=', $startDate))
+            ->when($endDate, fn($q) => $q->whereDate('created_at', '<=', $endDate))
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
+
+        return view('sale-sources.index', compact('saleSources', 'startDate', 'endDate'));
     }
 
     public function store(StoreSaleSourceRequest $request)

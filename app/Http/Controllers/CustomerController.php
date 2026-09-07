@@ -5,14 +5,22 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreCustomerRequest;
 use App\Http\Requests\UpdateCustomerRequest;
 use App\Models\Customer;
+use Illuminate\Http\Request;
 
 class CustomerController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $customers = Customer::latest()->paginate(10);
+        $startDate = $request->input('start_date');
+        $endDate   = $request->input('end_date');
 
-        return view('customers.index', compact('customers'));
+        $customers = Customer::when($startDate, fn($q) => $q->whereDate('created_at', '>=', $startDate))
+            ->when($endDate, fn($q) => $q->whereDate('created_at', '<=', $endDate))
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
+
+        return view('customers.index', compact('customers', 'startDate', 'endDate'));
     }
 
     public function store(StoreCustomerRequest $request)

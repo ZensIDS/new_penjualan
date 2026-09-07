@@ -5,17 +5,24 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreCategoryRequest;
 use App\Http\Requests\UpdateCategoryRequest;
 use App\Models\Category;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class CategoryController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $categories = Category::withCount('products')
-            ->latest()
-            ->paginate(10);
+        $startDate = $request->input('start_date');
+        $endDate   = $request->input('end_date');
 
-        return view('categories.index', compact('categories'));
+        $categories = Category::withCount('products')
+            ->when($startDate, fn($q) => $q->whereDate('created_at', '>=', $startDate))
+            ->when($endDate, fn($q) => $q->whereDate('created_at', '<=', $endDate))
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
+
+        return view('categories.index', compact('categories', 'startDate', 'endDate'));
     }
 
     public function store(StoreCategoryRequest $request)

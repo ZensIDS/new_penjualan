@@ -47,7 +47,7 @@
                             <p class="font-medium truncate">{{ $r['return_number'] }}</p>
                             <p class="text-xs text-ink/40">
                                 {{ $r['customer'] }} &middot; SO {{ $r['so_number'] }} &middot;
-                                {{ \Illuminate\Support\Carbon::parse($r['return_date'])->translatedFormat('d M Y') }}
+                                {{ \Illuminate\Support\Carbon::parse($r['return_date'])->format('d M Y') }}
                             </p>
                         </div>
                     </div>

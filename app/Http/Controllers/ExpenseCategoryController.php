@@ -5,16 +5,23 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreExpenseCategoryRequest;
 use App\Http\Requests\UpdateExpenseCategoryRequest;
 use App\Models\ExpenseCategory;
+use Illuminate\Http\Request;
 
 class ExpenseCategoryController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $expenseCategories = ExpenseCategory::withCount('expenses')
-            ->latest()
-            ->paginate(10);
+        $startDate = $request->input('start_date');
+        $endDate   = $request->input('end_date');
 
-        return view('expense-categories.index', compact('expenseCategories'));
+        $expenseCategories = ExpenseCategory::withCount('expenses')
+            ->when($startDate, fn($q) => $q->whereDate('created_at', '>=', $startDate))
+            ->when($endDate, fn($q) => $q->whereDate('created_at', '<=', $endDate))
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
+
+        return view('expense-categories.index', compact('expenseCategories', 'startDate', 'endDate'));
     }
 
     public function store(StoreExpenseCategoryRequest $request)

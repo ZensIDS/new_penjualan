@@ -1,4 +1,3 @@
-
 @extends('layouts.app')
 
 @section('page-title', 'Asal Penjualan')
@@ -31,6 +30,8 @@
         <span x-text="flash"></span>
     </div>
 
+    @include('partials.date-range-filter', ['routeName' => 'sale-sources.index', 'dateLabel' => 'Tgl Dibuat'])
+
     <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
@@ -38,6 +39,7 @@
                     <tr class="bg-ink/[0.03] text-left text-ink/50">
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Nama</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Jml Transaksi</th>
+                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Tgl Dibuat</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Aksi</th>
                     </tr>
                 </thead>
@@ -50,6 +52,7 @@
                                     {{ $saleSource->sales_orders_count }}
                                 </span>
                             </td>
+                            <td class="px-5 py-3.5 tnum">{{ $saleSource->created_at->format('d M Y') }}</td>
                             <td class="px-5 py-3.5 text-right">
                                 @if (auth()->user()->isSuperadmin())
                                     <button
@@ -65,7 +68,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="3" class="px-5 py-10 text-center text-ink/40">Belum ada asal penjualan.</td>
+                            <td colspan="4" class="px-5 py-10 text-center text-ink/40">Belum ada asal penjualan.</td>
                         </tr>
                     @endforelse
                 </tbody>

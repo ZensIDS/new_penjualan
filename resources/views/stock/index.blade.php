@@ -79,7 +79,7 @@
                             <tbody class="divide-y divide-ink/[0.05]">
                                 @foreach ($p['batches'] as $b)
                                     <tr>
-                                        <td class="py-1.5 tnum">{{ $b['batch_date'] }}</td>
+                                        <td class="py-1.5 tnum">{{ \Illuminate\Support\Carbon::parse($b['batch_date'])->format('d M Y') }}</td>
                                         <td class="py-1.5 tnum text-right">Rp {{ number_format($b['buy_price'], 0, ',', '.') }}</td>
                                         <td class="py-1.5 tnum text-right">{{ $b['qty_in'] }}</td>
                                         <td class="py-1.5 tnum text-right font-medium">{{ $b['qty_remaining'] }}</td>
