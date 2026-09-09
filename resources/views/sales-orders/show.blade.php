@@ -34,7 +34,7 @@
                 </span>
             </div>
             <p class="text-sm text-ink/50">
-                {{ $salesOrder->so_date->format('d M Y') }} &middot; {{ $salesOrder->customer->name ?? 'Customer umum' }}
+                {{ $salesOrder->so_date->format('d M Y') }} &middot; {{ $salesOrder->customer->name ?? '-' }}
             </p>
         </div>
 
