@@ -13,6 +13,14 @@
             <p class="text-sm text-ink/50">orang bagi hasil</p>
         </div>
 
+        <div class="flex items-center gap-2">
+            <a
+                href="{{ route('profit-share-distributions.index') }}"
+                class="inline-flex items-center gap-2 text-sm font-semibold border border-ink/12 text-ink px-5 py-2.5 rounded-xl hover:bg-ink/[0.03] transition-colors"
+            >
+                <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v8m-4-4h8M4 12a8 8 0 1 1 16 0 8 8 0 0 1-16 0Z"/></svg>
+                Distribusi &amp; Histori
+            </a>
         @if (auth()->user()->isSuperadmin())
             <button
                 @click="openCreate()"
@@ -22,6 +30,7 @@
                 Tambah Orang
             </button>
         @endif
+        </div>
     </div>
 
     <div x-show="flash" x-cloak x-transition

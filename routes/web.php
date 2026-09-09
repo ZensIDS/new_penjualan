@@ -10,6 +10,7 @@ use App\Http\Controllers\IncomeCategoryController;
 use App\Http\Controllers\IncomeController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfitShareController;
+use App\Http\Controllers\ProfitShareDistributionController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchaseReturnController;
 use App\Http\Controllers\ReportController;
@@ -77,6 +78,8 @@ Route::middleware('auth')->group(function () {
     Route::get('incomes', [IncomeController::class, 'index'])->name('incomes.index');
     Route::get('income-categories', [IncomeCategoryController::class, 'index'])->name('income-categories.index');
     Route::get('profit-shares', [ProfitShareController::class, 'index'])->name('profit-shares.index');
+    Route::get('profit-share-distributions', [ProfitShareDistributionController::class, 'index'])->name('profit-share-distributions.index');
+    Route::get('profit-share-distributions/net-profit', [ProfitShareDistributionController::class, 'netProfit'])->name('profit-share-distributions.net-profit');
 
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('stock', [ReportController::class, 'stock'])->name('stock');
@@ -169,4 +172,12 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
 
     Route::resource('profit-shares', ProfitShareController::class)
         ->only(['store', 'update', 'destroy']);
+
+    // Distribusi bersifat transaksi kas riil (immutable) — hanya bisa dicatat
+    // atau dihapus (tidak ada 'update'), sama seperti pola retur SO/PO di atas.
+    // Koreksi dilakukan dengan hapus lalu catat ulang.
+    Route::post('profit-share-distributions', [ProfitShareDistributionController::class, 'store'])
+        ->name('profit-share-distributions.store');
+    Route::delete('profit-share-distributions/{profitShareDistribution}', [ProfitShareDistributionController::class, 'destroy'])
+        ->name('profit-share-distributions.destroy');
 });

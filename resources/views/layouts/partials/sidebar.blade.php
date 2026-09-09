@@ -22,6 +22,7 @@
             ['label' => 'Kategori Pengeluaran', 'route' => 'expense-categories.index', 'pattern' => 'expense-categories.*'],
             ['label' => 'Pengeluaran', 'route' => 'expenses.index', 'pattern' => 'expenses.*'],
             ['label' => 'Bagi Hasil', 'route' => 'profit-shares.index', 'pattern' => 'profit-shares.*'],
+            ['label' => 'Distribusi Bagi Hasil', 'route' => 'profit-share-distributions.index', 'pattern' => 'profit-share-distributions.*'],
         ],
         'Laporan' => [
             ['label' => 'Stok', 'route' => 'reports.stock', 'pattern' => 'reports.stock'],
