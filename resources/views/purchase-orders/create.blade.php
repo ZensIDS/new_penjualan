@@ -130,15 +130,22 @@
             <p class="text-xs text-ink/50 mb-4">Opsional — kosongkan kalau belum ada pembayaran sama sekali (status akan "Belum Bayar").</p>
             <div class="grid grid-cols-1 @4xl:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium mb-1.5">Jumlah Dibayar</label>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="block text-sm font-medium">Jumlah Dibayar <button type="button" @click="initialPayment = total"
+                                class="text-xs font-semibold text-amber-700 hover:text-amber-800">
+                            Bayar Lunas (isi maksimal)
+                        </button></label>
+                        
+                    </div>
                     <div class="relative">
                         <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-ink/40">Rp</span>
                         <input type="text" inputmode="numeric"
                                :value="formatRupiah(initialPayment)"
-                               @input="initialPayment = parseRupiah($event.target.value); $event.target.value = formatRupiah(initialPayment)"
+                               @input="initialPayment = Math.min(parseRupiah($event.target.value), total); $event.target.value = formatRupiah(initialPayment)"
                                class="w-full rounded-xl border border-ink/12 pl-9 pr-3.5 py-2.5 text-sm tnum focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
                         <input type="hidden" name="initial_payment" :value="initialPayment">
                     </div>
+                    <p class="text-xs text-ink/40 mt-1">Maksimal Rp <span x-text="formatRupiah(total)"></span> (sesuai Total PO)</p>
                     @error('initial_payment')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
                 </div>
                 <div>
