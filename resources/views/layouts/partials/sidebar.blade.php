@@ -9,6 +9,7 @@
         ],
         'Persediaan' => [
             ['label' => 'Stok', 'route' => 'stock.index', 'pattern' => 'stock.*'],
+            ['label' => 'Bongkar Unit', 'route' => 'stock-conversions.index', 'pattern' => 'stock-conversions.*'],
             ['label' => 'Produk', 'route' => 'products.index', 'pattern' => 'products.*'],
             ['label' => 'Kategori', 'route' => 'categories.index', 'pattern' => 'categories.*'],
         ],

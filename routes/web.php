@@ -19,6 +19,7 @@ use App\Http\Controllers\SaleSourceController;
 use App\Http\Controllers\SalesOrderController;
 use App\Http\Controllers\SalesReturnController;
 use App\Http\Controllers\StockController;
+use App\Http\Controllers\StockConversionController;
 use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
 
@@ -63,6 +64,16 @@ Route::middleware('auth')->group(function () {
         ->name('sales-orders.edit');
 
     Route::resource('sales-orders', SalesOrderController::class)
+        ->only(['index', 'show']);
+
+    // Bongkar Unit (stock conversion): pola sama dengan PO/SO — punya halaman
+    // create tersendiri, jadi route 'create' WAJIB didaftarkan sebelum
+    // resource(['index','show']) supaya tidak ketangkep wildcard {stockConversion}.
+    Route::get('stock-conversions/create', [StockConversionController::class, 'create'])
+        ->middleware('role:superadmin')
+        ->name('stock-conversions.create');
+
+    Route::resource('stock-conversions', StockConversionController::class)
         ->only(['index', 'show']);
 
     // Modul di bawah ini pakai pola index + modal (create/edit AJAX),
@@ -142,6 +153,15 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
         ->name('sales-orders.returns.store');
     Route::delete('sales-orders/{salesOrder}/returns/{return}', [SalesReturnController::class, 'destroy'])
         ->name('sales-orders.returns.destroy');
+
+    // Pembongkaran bersifat immutable (tidak ada 'update'): koreksi dilakukan
+    // dengan membatalkan lalu mencatat ulang, sama seperti pola retur SO/PO.
+    // Pembatalan hanya diizinkan selama komponen hasilnya belum terjual —
+    // aturan itu ditegakkan di StockConversionService::delete().
+    Route::post('stock-conversions', [StockConversionController::class, 'store'])
+        ->name('stock-conversions.store');
+    Route::delete('stock-conversions/{stockConversion}', [StockConversionController::class, 'destroy'])
+        ->name('stock-conversions.destroy');
 
     Route::resource('products', ProductController::class)
         ->only(['store', 'update', 'destroy']);
