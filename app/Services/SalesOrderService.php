@@ -13,6 +13,7 @@ class SalesOrderService
         protected StockService $stockService,
         protected CashFlowService $cashFlowService,
         protected DocumentNumberService $numberService,
+        protected StockConversionService $stockConversionService,
     ) {}
 
     /**
@@ -53,6 +54,13 @@ class SalesOrderService
                     'subtotal'     => $item['qty'] * $item['sell_price'],
                     'hpp_subtotal' => 0,
                 ]);
+
+                // Kalau produk ini komponen hasil bongkar, harga jual yang BARU SAJA
+                // disepakati di transaksi ini adalah informasi paling sahih untuk
+                // membagi HPP unit utuh ke komponen-komponennya. Dijalankan SEBELUM
+                // FIFO supaya HPP yang tersnapshot di alokasi sudah pakai angka
+                // terbaru. Tidak melakukan apa-apa untuk produk beli biasa.
+                $this->stockConversionService->syncAfterSale($product->id, (float) $item['sell_price']);
 
                 // Inti FIFO: potong stok dari batch tertua, dapatkan rincian alokasi
                 $allocations = $this->stockService->allocateFifo(
@@ -226,6 +234,10 @@ class SalesOrderService
                     'subtotal'     => $item['qty'] * $item['sell_price'],
                     'hpp_subtotal' => 0,
                 ]);
+
+                // Sama seperti saat SO dibuat: harga jual hasil edit ini dipakai
+                // memperbarui pembagian HPP komponen hasil bongkar.
+                $this->stockConversionService->syncAfterSale($product->id, (float) $item['sell_price']);
 
                 $allocations = $this->stockService->allocateFifo(
                     $product,

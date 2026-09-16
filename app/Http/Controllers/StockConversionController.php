@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ContinueStockConversionRequest;
 use App\Http\Requests\StoreStockConversionRequest;
 use App\Models\Product;
+use App\Models\SaleItem;
 use App\Models\StockBatch;
 use App\Models\StockConversion;
 use App\Services\StockConversionService;
@@ -57,16 +59,59 @@ class StockConversionController extends Controller
     {
         try {
             $conversion = $this->service->create(
-                $request->only(['conversion_date', 'source_product_id', 'source_qty', 'allocation_method', 'note']),
+                $request->only(['conversion_date', 'source_product_id', 'source_qty', 'note', 'status']),
                 $request->input('components')
             );
         } catch (\RuntimeException $e) {
             return back()->withInput()->withErrors(['error' => $e->getMessage()]);
         }
 
+        $message = $conversion->isDraft()
+            ? "Pembongkaran {$conversion->conversion_number} tersimpan. Komponen sudah masuk stok dan siap dijual — kalau nanti ketemu komponen lain, tambahkan lewat \"Lanjutkan Bongkar\"."
+            : "Pembongkaran {$conversion->conversion_number} berhasil dicatat. Komponen sudah masuk stok dan siap dijual.";
+
         return redirect()
             ->route('stock-conversions.show', $conversion)
-            ->with('success', "Pembongkaran {$conversion->conversion_number} berhasil dicatat. Komponen sudah masuk stok dan siap dijual.");
+            ->with('success', $message);
+    }
+
+    /**
+     * Form "Lanjutkan Bongkar" — cuma untuk transaksi yang masih draft.
+     */
+    public function continueForm(StockConversion $stockConversion)
+    {
+        if (! $stockConversion->isDraft()) {
+            return redirect()
+                ->route('stock-conversions.show', $stockConversion)
+                ->with('success', "Pembongkaran {$stockConversion->conversion_number} sudah selesai, tidak ada lagi yang perlu dilanjutkan.");
+        }
+
+        $stockConversion->load(['results.product', 'results.stockBatch', 'sourceProduct']);
+
+        return view('stock-conversions.continue', [
+            'conversion' => $stockConversion,
+            'products'   => $this->productsForForm(),
+        ]);
+    }
+
+    public function continueStore(ContinueStockConversionRequest $request, StockConversion $stockConversion)
+    {
+        try {
+            $conversion = $this->service->continueConversion(
+                $stockConversion,
+                $request->only(['mark_complete']),
+                $request->input('existing', []),
+                $request->input('components', [])
+            );
+        } catch (\RuntimeException $e) {
+            return back()->withInput()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        $message = $conversion->isDraft()
+            ? "Komponen untuk {$conversion->conversion_number} tersimpan dan HPP sudah dibagi ulang ke semua komponen."
+            : "Pembongkaran {$conversion->conversion_number} sudah lengkap — semua komponen tercatat dan HPP sudah dibagi habis.";
+
+        return redirect()->route('stock-conversions.show', $conversion)->with('success', $message);
     }
 
     public function show(StockConversion $stockConversion)
@@ -116,8 +161,21 @@ class StockConversionController extends Controller
             ->groupBy('product_id')
             ->map(fn($rows) => (float) $rows->first()->buy_price);
 
-        return $products->map(function ($p) use ($nextBuyPrices) {
+        // Harga jual acuan = harga jual RIIL terakhir produk tsb di Sales Order.
+        // Dipakai form cuma untuk memperlihatkan pratinjau pembagian HPP; angka
+        // final tetap dihitung ulang server-side (dan diperbarui otomatis setiap
+        // kali ada penjualan baru).
+        $lastSellPrices = SaleItem::query()
+            ->join('sales_orders', 'sales_orders.id', '=', 'sale_items.sales_order_id')
+            ->orderBy('sales_orders.so_date')
+            ->orderBy('sale_items.id')
+            ->get(['sale_items.product_id', 'sale_items.sell_price'])
+            ->groupBy('product_id')
+            ->map(fn($rows) => (float) $rows->last()->sell_price);
+
+        return $products->map(function ($p) use ($nextBuyPrices, $lastSellPrices) {
             $p->next_buy_price = $nextBuyPrices[$p->id] ?? 0;
+            $p->ref_sell_price = $lastSellPrices[$p->id] ?? 0;
 
             return $p;
         });
@@ -134,18 +192,15 @@ class StockConversionController extends Controller
             ->groupBy('source_product_id')
             ->pluck('id');
 
-        return StockConversion::with('results:id,stock_conversion_id,product_id,qty,allocation_percent,estimated_sell_price')
+        return StockConversion::with('results:id,stock_conversion_id,product_id,qty')
             ->whereIn('id', $latestIds)
             ->get()
             ->mapWithKeys(fn($c) => [
                 $c->source_product_id => [
-                    'allocation_method' => $c->allocation_method,
-                    'source_qty'        => $c->source_qty,
-                    'components'        => $c->results->map(fn($r) => [
-                        'product_id'           => $r->product_id,
-                        'qty'                  => $r->qty,
-                        'allocation_percent'   => $r->allocation_percent,
-                        'estimated_sell_price' => $r->estimated_sell_price,
+                    'source_qty' => $c->source_qty,
+                    'components' => $c->results->map(fn($r) => [
+                        'product_id' => $r->product_id,
+                        'qty'        => $r->qty,
                     ])->values(),
                 ],
             ])

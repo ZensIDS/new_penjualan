@@ -2,102 +2,111 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * MODUL "BONGKAR UNIT" (stock conversion / disassembly).
+ * Sampai sekarang SETIAP batch stok wajib lahir dari 1 baris purchase_order_item
+ * (kolom purchase_order_item_id NOT NULL + unique). Dengan adanya fitur
+ * "Bongkar Unit" (lihat migration berikutnya), batch stok bisa lahir dari
+ * sumber kedua: hasil pembongkaran unit utuh menjadi komponen.
  *
- * Kasus bisnis: client beli barang UTUH (mis. baterai "Huawei B1"), tapi kadang
- * dijual utuh, kadang dibongkar dan dijual ecer per komponen (cell, BMS, casing).
+ * Yang diubah:
+ * 1. purchase_order_item_id jadi NULLABLE (batch hasil bongkar tidak punya PO item).
+ *    Unique tetap dipertahankan — di MySQL/PostgreSQL, unique index MENGIZINKAN
+ *    banyak baris NULL, jadi aturan "1 PO item = 1 batch" tetap terjaga.
+ * 2. Tambah kolom origin_type untuk membedakan asal batch secara eksplisit,
+ *    supaya query/laporan tidak perlu menebak dari NULL-nya foreign key.
  *
- * Aturan inti yang dipegang desain ini:
- * - Unit utuh dan komponen adalah PRODUK YANG BERBEDA di master produk.
- * - Pembongkaran BUKAN penjualan dan BUKAN pembelian: tidak ada uang keluar/masuk,
- *   jadi tidak menyentuh cash_flow maupun laba rugi.
- * - Yang terjadi hanyalah PEMINDAHAN NILAI: HPP unit utuh (diambil FIFO dari
- *   batch-nya) dipecah ke batch-batch baru milik tiap komponen. Total HPP sebelum
- *   dan sesudah bongkar SAMA (selisih pembulatan disimpan di rounding_diff).
- * - Setelah dibongkar, komponen dijual lewat Sales Order seperti produk biasa,
- *   FIFO & perhitungan laba jalan otomatis tanpa perubahan apa pun.
+ * CATATAN IMPLEMENTASI: sengaja TIDAK memakai Blueprint::change() supaya tidak
+ * butuh doctrine/dbal. MySQL tidak bisa mengubah nullable pada kolom yang masih
+ * terikat foreign key, jadi FK-nya di-drop dulu, kolom diubah via raw SQL
+ * (MODIFY), lalu FK-nya dipasang lagi. Ditulis khusus untuk MySQL/MariaDB
+ * (sesuai project ini) — kalau connection-mu Postgres/SQLite, beri tahu saya,
+ * sintaksnya beda.
  */
 return new class extends Migration
 {
     public function up(): void
     {
-        // --- Header pembongkaran ---
-        Schema::create('stock_conversions', function (Blueprint $table) {
-            $table->id();
-            $table->string('conversion_number')->unique(); // BK/IX/2026/001
-            $table->date('conversion_date');
+        $foreignKey = $this->findForeignKeyName();
 
-            // Produk utuh yang dibongkar + berapa unit yang dibongkar
-            $table->foreignId('source_product_id')->constrained('products')->cascadeOnUpdate()->restrictOnDelete();
-            $table->integer('source_qty');
-
-            // Total HPP yang diambil dari batch-batch sumber (hasil FIFO).
-            // Nilai inilah yang dibagi habis ke komponen.
-            $table->decimal('total_hpp', 15, 2);
-
-            // Cara membagi HPP ke komponen:
-            // - percent : user isi persentase per komponen (total harus 100%)
-            // - market  : dibagi proporsional terhadap estimasi harga jual x qty
-            //             (relative sales value method — paling adil & paling lazim)
-            // - manual  : user isi langsung nominal HPP per komponen (total harus = total_hpp)
-            $table->enum('allocation_method', ['percent', 'market', 'manual'])->default('market');
-
-            // Sisa pembulatan (biasanya 0 s/d beberapa rupiah) supaya selisihnya
-            // tercatat dan bisa ditelusuri, bukan hilang diam-diam.
-            $table->decimal('rounding_diff', 15, 2)->default(0);
-
-            $table->text('note')->nullable();
-            $table->timestamps();
-
-            $table->index(['conversion_date', 'source_product_id']);
+        Schema::table('stock_batches', function (Blueprint $table) use ($foreignKey) {
+            $table->dropForeign($foreignKey);
         });
 
-        // --- Batch sumber yang dipotong (hasil FIFO), pola sama seperti sale_item_allocations ---
-        Schema::create('stock_conversion_sources', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('stock_conversion_id')->constrained('stock_conversions')->cascadeOnUpdate()->cascadeOnDelete();
-            $table->foreignId('stock_batch_id')->constrained('stock_batches')->cascadeOnUpdate()->restrictOnDelete();
-            $table->integer('qty_taken');
-            $table->decimal('buy_price_at_time', 15, 2); // snapshot HPP/unit batch sumber
-            $table->decimal('hpp_subtotal', 15, 2);      // qty_taken * buy_price_at_time
-            $table->timestamps();
+        // Definisi kolom disamakan persis dengan migration aslinya
+        // (foreignId = BIGINT UNSIGNED), cuma menghapus NOT NULL.
+        DB::statement('ALTER TABLE stock_batches MODIFY purchase_order_item_id BIGINT UNSIGNED NULL');
 
-            $table->index('stock_batch_id');
+        Schema::table('stock_batches', function (Blueprint $table) {
+            $table->foreign('purchase_order_item_id')
+                ->references('id')->on('purchase_order_items')
+                ->cascadeOnUpdate()
+                ->cascadeOnDelete();
         });
 
-        // --- Komponen hasil bongkar + batch baru yang dilahirkannya ---
-        Schema::create('stock_conversion_results', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('stock_conversion_id')->constrained('stock_conversions')->cascadeOnUpdate()->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained('products')->cascadeOnUpdate()->restrictOnDelete();
-
-            // Batch stok yang dibuat untuk komponen ini. Nullable supaya kalau
-            // batch dihapus (pembatalan bongkar) barisnya tidak ikut hilang mendadak.
-            $table->foreignId('stock_batch_id')->nullable()->constrained('stock_batches')->nullOnDelete();
-
-            $table->integer('qty'); // total qty komponen yang dihasilkan dari source_qty unit
-
-            // Input mentah dari user, disimpan apa adanya supaya bisa diaudit ulang:
-            $table->decimal('allocation_percent', 8, 4)->nullable();     // dipakai saat method = percent
-            $table->decimal('estimated_sell_price', 15, 2)->nullable();  // dipakai saat method = market
-
-            // Hasil akhir perhitungan:
-            $table->decimal('buy_price', 15, 2); // HPP per unit komponen -> masuk ke stock_batches.buy_price
-            $table->decimal('hpp_total', 15, 2); // buy_price * qty
-
-            $table->timestamps();
-
-            $table->index(['stock_conversion_id', 'product_id']);
+        Schema::table('stock_batches', function (Blueprint $table) {
+            if (! Schema::hasColumn('stock_batches', 'origin_type')) {
+                $table->enum('origin_type', ['purchase', 'conversion'])
+                    ->default('purchase')
+                    ->after('purchase_order_item_id');
+                $table->index(['product_id', 'origin_type']);
+            }
         });
+
+        // Semua batch lama pasti berasal dari pembelian.
+        DB::table('stock_batches')->whereNull('origin_type')->update(['origin_type' => 'purchase']);
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('stock_conversion_results');
-        Schema::dropIfExists('stock_conversion_sources');
-        Schema::dropIfExists('stock_conversions');
+        Schema::table('stock_batches', function (Blueprint $table) {
+            $table->dropIndex(['product_id', 'origin_type']);
+            $table->dropColumn('origin_type');
+        });
+
+        // Catatan: mengembalikan purchase_order_item_id jadi NOT NULL hanya aman
+        // kalau semua batch hasil bongkar sudah dihapus lebih dulu.
+        $foreignKey = $this->findForeignKeyName();
+
+        Schema::table('stock_batches', function (Blueprint $table) use ($foreignKey) {
+            $table->dropForeign($foreignKey);
+        });
+
+        DB::statement('ALTER TABLE stock_batches MODIFY purchase_order_item_id BIGINT UNSIGNED NOT NULL');
+
+        Schema::table('stock_batches', function (Blueprint $table) {
+            $table->foreign('purchase_order_item_id')
+                ->references('id')->on('purchase_order_items')
+                ->cascadeOnUpdate()
+                ->cascadeOnDelete();
+        });
+    }
+
+    /**
+     * Cari nama constraint foreign key untuk purchase_order_item_id secara
+     * dinamis (bukan hardcode 'stock_batches_purchase_order_item_id_foreign'),
+     * supaya migration tetap jalan walau nama constraint-nya sempat diubah manual.
+     */
+    protected function findForeignKeyName(): string
+    {
+        $row = DB::selectOne(
+            "SELECT CONSTRAINT_NAME
+             FROM information_schema.KEY_COLUMN_USAGE
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'stock_batches'
+               AND COLUMN_NAME = 'purchase_order_item_id'
+               AND REFERENCED_TABLE_NAME IS NOT NULL
+             LIMIT 1"
+        );
+
+        if (! $row) {
+            throw new \RuntimeException(
+                'Tidak menemukan foreign key untuk stock_batches.purchase_order_item_id. Cek manual nama constraint-nya lalu sesuaikan migration ini.'
+            );
+        }
+
+        return $row->CONSTRAINT_NAME;
     }
 };

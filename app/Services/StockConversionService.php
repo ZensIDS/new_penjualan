@@ -3,25 +3,49 @@
 namespace App\Services;
 
 use App\Models\Product;
+use App\Models\SaleItem;
 use App\Models\StockConversion;
+use App\Models\StockConversionResult;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
  * Otak fitur "Bongkar Unit".
  *
- * Alur 1 kali pembongkaran:
- *   1. Ambil N unit produk utuh dari stok secara FIFO (persis seperti penjualan),
- *      sehingga dapat TOTAL HPP riil dari batch-batch yang dipotong.
- *   2. Bagi total HPP itu ke komponen-komponen hasil bongkar, pakai salah satu
- *      dari 3 metode (percent / market / manual).
- *   3. Buat batch stok baru untuk tiap komponen dengan buy_price = HPP hasil bagi.
+ * ================== CARA HPP DIBAGI (versi sekarang) ==================
+ * Cuma ADA SATU cara, tidak ada lagi pilihan metode: HPP unit utuh dibagi ke
+ * komponen secara PROPORSIONAL TERHADAP NILAI JUALNYA (relative sales value —
+ * metode paling lazim untuk memecah biaya gabungan). Komponen yang harga
+ * jualnya lebih tinggi menyerap HPP lebih besar.
  *
- * Prinsip yang dijaga mati-matian:
- * - TIDAK ADA uang keluar/masuk -> tidak menyentuh cash_flow & tidak bikin laba/rugi.
- *   Laba baru muncul nanti saat komponennya dijual lewat Sales Order biasa.
- * - Total HPP sebelum = total HPP sesudah. Sisa pembulatan (paling banter
- *   beberapa rupiah) dibuang ke komponen terakhir dan dicatat di rounding_diff.
+ * Bedanya dengan versi lama: harga jual yang dipakai TIDAK DIKETIK USER saat
+ * membongkar. Harga jual di bisnis ini fluktuatif dan tergantung negosiasi,
+ * jadi menebaknya di muka cuma bikin HPP meleset. Sistem memakai harga jual
+ * RIIL terakhir dari Sales Order untuk tiap komponen, dan menghitung ulang
+ * pembagian di balik layar setiap kali ada penjualan baru
+ * (lihat syncAfterSale() yang dipanggil SalesOrderService).
+ *
+ * Urutan acuan harga jual per komponen:
+ *   1. Harga jual terakhir komponen itu di Sales Order (yang paling sahih).
+ *   2. Kalau komponen itu belum pernah terjual: rata-rata harga jual komponen
+ *      lain dalam pembongkaran yang sama yang sudah diketahui.
+ *   3. Kalau belum ada satu pun yang pernah terjual: dibagi rata per unit.
+ * Begitu penjualan pertama terjadi, angka tebakan itu langsung tergantikan
+ * angka riil dan HPP sisa stok menyesuaikan sendiri.
+ *
+ * ================== YANG TETAP DIJAGA ==================
+ * - Pembongkaran BUKAN penjualan/pembelian: tidak ada uang keluar-masuk, tidak
+ *   menyentuh cash flow, tidak melahirkan laba/rugi.
+ * - total_hpp FINAL sejak FIFO jalan di langkah pertama dan tidak pernah berubah.
+ *   Semua perhitungan ulang cuma memecah ULANG angka yang sama itu.
+ * - Perhitungan ulang HANYA menyentuh sisa stok yang belum terjual. HPP yang
+ *   sudah terlanjur keluar lewat penjualan sudah tersnapshot di
+ *   SaleItemAllocation.buy_price_at_time, jadi laporan laba rugi transaksi lama
+ *   TIDAK pernah berubah di belakang punggung user.
+ * - Mode bertahap (draft) tetap ada, tapi TANPA ribet: seluruh HPP unit selalu
+ *   dibagi habis ke komponen yang sudah tercatat. Kalau besok ketemu komponen
+ *   lain, HPP tinggal dibagi ulang ke semua komponen — user tidak perlu
+ *   menghitung atau menyisihkan apa pun.
  */
 class StockConversionService
 {
@@ -32,14 +56,16 @@ class StockConversionService
 
     /**
      * @param array $data       ['conversion_date', 'source_product_id', 'source_qty',
-     *                           'allocation_method', 'note']
-     * @param array $components [['product_id', 'qty', 'allocation_percent'?,
-     *                            'estimated_sell_price'?, 'hpp_total'?], ...]
+     *                           'note', 'status'?]
+     *                          'status' = 'draft' kalau belum semua komponen diketahui
+     *                          (masih boleh ditambah lewat "Lanjutkan Bongkar").
+     * @param array $components [['product_id', 'qty'], ...]
      */
     public function create(array $data, array $components): StockConversion
     {
         return DB::transaction(function () use ($data, $components) {
             $sourceProduct = Product::lockForUpdate()->findOrFail($data['source_product_id']);
+            $isDraft = ($data['status'] ?? 'selesai') === 'draft';
 
             $this->guardComponents($sourceProduct, $components);
 
@@ -49,7 +75,7 @@ class StockConversionService
                 'conversion_date'   => $data['conversion_date'],
                 'source_product_id' => $sourceProduct->id,
                 'source_qty'        => $data['source_qty'],
-                'allocation_method' => $data['allocation_method'],
+                'status'            => $isDraft ? 'draft' : 'selesai',
                 'total_hpp'         => 0, // diisi setelah FIFO
                 'rounding_diff'     => 0,
                 'note'              => $data['note'] ?? null,
@@ -69,58 +95,273 @@ class StockConversionService
                 $totalHpp += $alloc['hpp_subtotal'];
             }
 
+            // total_hpp final di sini dan TIDAK PERNAH berubah lagi.
             $conversion->update(['total_hpp' => $totalHpp]);
 
-            // --- Langkah 2: bagi total HPP ke komponen ---
-            $shares = $this->splitHpp($totalHpp, $components, $data['allocation_method']);
-
-            // --- Langkah 3: lahirkan batch baru per komponen ---
-            $distributed = 0;
-
-            foreach ($components as $i => $component) {
-                $hppTotal = $shares[$i];
-                $qty      = (int) $component['qty'];
-                $buyPrice = round($hppTotal / $qty, 2);
-
-                // buy_price dibulatkan ke 2 desimal, jadi nilai batch yang benar-benar
-                // tersimpan adalah buy_price * qty — itu yang dicatat sebagai hpp_total
-                // supaya angka di laporan bongkar SAMA PERSIS dengan nilai stok riil.
-                $hppTotal = round($buyPrice * $qty, 2);
-                $distributed += $hppTotal;
-
+            // --- Langkah 2: lahirkan batch komponen (harga menyusul di rebalance) ---
+            foreach ($components as $component) {
                 $batch = $this->stockService->receiveFromConversion(
                     $conversion,
                     (int) $component['product_id'],
-                    $qty,
-                    $buyPrice
+                    (int) $component['qty'],
+                    0
                 );
 
                 $conversion->results()->create([
-                    'product_id'           => $component['product_id'],
-                    'stock_batch_id'       => $batch->id,
-                    'qty'                  => $qty,
-                    'allocation_percent'   => $component['allocation_percent'] ?? null,
-                    'estimated_sell_price' => $component['estimated_sell_price'] ?? null,
-                    'buy_price'            => $buyPrice,
-                    'hpp_total'            => $hppTotal,
+                    'product_id'     => $component['product_id'],
+                    'stock_batch_id' => $batch->id,
+                    'qty'            => (int) $component['qty'],
+                    'ref_sell_price' => null,
+                    'buy_price'      => 0,
+                    'hpp_total'      => 0,
                 ]);
             }
 
-            // Selisih pembulatan disimpan, bukan disembunyikan. Nilainya sangat kecil
-            // (maksimal beberapa rupiah) dan akan muncul sebagai beda HPP tipis saat
-            // komponen terjual habis — ini wajar dan bisa ditelusuri dari sini.
-            $conversion->update(['rounding_diff' => round($totalHpp - $distributed, 2)]);
+            // --- Langkah 3: bagi HPP proporsional terhadap harga jual acuan ---
+            $this->rebalance($conversion);
 
-            return $conversion->fresh(['sources.stockBatch', 'results.product', 'sourceProduct']);
+            return $conversion->fresh(['sources.stockBatch', 'results.product', 'results.stockBatch', 'sourceProduct']);
         });
+    }
+
+    /**
+     * Lanjutkan pembongkaran yang statusnya masih 'draft': tambah komponen baru
+     * dan/atau tambah qty komponen yang sudah ada, lalu bagi ulang total_hpp
+     * (yang nilainya tetap) ke semua komponen.
+     *
+     * @param array $meta         ['mark_complete'?]
+     * @param array $existingRows [['result_id', 'qty'], ...]
+     * @param array $newComponents [['product_id', 'qty'], ...]
+     *
+     * @throws RuntimeException kalau conversion sudah selesai atau qty dikurangi
+     *                          di bawah yang sudah terjual.
+     */
+    public function continueConversion(
+        StockConversion $conversion,
+        array $meta,
+        array $existingRows,
+        array $newComponents
+    ): StockConversion {
+        return DB::transaction(function () use ($conversion, $meta, $existingRows, $newComponents) {
+            $conversion = StockConversion::where('id', $conversion->id)->lockForUpdate()->firstOrFail();
+            $conversion->load(['results.stockBatch', 'results.product', 'sourceProduct']);
+
+            if (! $conversion->isDraft()) {
+                throw new RuntimeException(
+                    "Pembongkaran {$conversion->conversion_number} sudah selesai (semua komponen sudah tercatat), tidak bisa dilanjutkan lagi."
+                );
+            }
+
+            $markComplete = (bool) ($meta['mark_complete'] ?? false);
+
+            // Gabungkan daftar komponen lama + baru cuma untuk divalidasi bentuknya.
+            $merged = [];
+            foreach ($conversion->results as $result) {
+                $merged[] = ['product_id' => $result->product_id, 'qty' => $result->qty];
+            }
+            foreach ($newComponents as $component) {
+                $merged[] = $component;
+            }
+
+            $this->guardComponents($conversion->sourceProduct, $merged);
+
+            // --- Komponen lama: qty boleh naik, tidak boleh turun di bawah terjual ---
+            $editsByResultId = collect($existingRows)->keyBy('result_id');
+
+            foreach ($conversion->results as $result) {
+                $edit = $editsByResultId->get($result->id);
+
+                if (! $edit || ! array_key_exists('qty', $edit)) {
+                    continue;
+                }
+
+                $newQty = (int) $edit['qty'];
+
+                if ($newQty === (int) $result->qty) {
+                    continue;
+                }
+
+                $batch = $result->stockBatch;
+                $used  = $batch ? ($batch->qty_in - $batch->qty_remaining) : 0;
+
+                if ($newQty < $used) {
+                    throw new RuntimeException(
+                        "Qty komponen \"{$result->product->name}\" tidak bisa dikurangi sampai di bawah {$used} unit yang sudah terjual/terpakai. Boleh ditambah, tidak boleh dikurangi."
+                    );
+                }
+
+                // HPP yang sudah keluar lewat penjualan dipertahankan apa adanya;
+                // qty tambahan untuk sementara dinilai dengan harga yang berlaku
+                // sekarang, lalu langsung dihitung ulang oleh rebalance() di bawah.
+                $released = $result->hpp_released;
+
+                $this->stockService->adjustConversionBatch(
+                    $batch,
+                    $newQty,
+                    (float) $result->buy_price,
+                    $conversion->conversion_date
+                );
+
+                $batch->refresh();
+
+                $result->update([
+                    'qty'       => $newQty,
+                    'hpp_total' => round($released + $batch->qty_remaining * (float) $result->buy_price, 2),
+                ]);
+            }
+
+            // --- Komponen baru: batch baru, harga menyusul di rebalance ---
+            foreach ($newComponents as $component) {
+                $batch = $this->stockService->receiveFromConversion(
+                    $conversion,
+                    (int) $component['product_id'],
+                    (int) $component['qty'],
+                    0
+                );
+
+                $conversion->results()->create([
+                    'product_id'     => $component['product_id'],
+                    'stock_batch_id' => $batch->id,
+                    'qty'            => (int) $component['qty'],
+                    'ref_sell_price' => null,
+                    'buy_price'      => 0,
+                    'hpp_total'      => 0,
+                ]);
+            }
+
+            $conversion->update(['status' => $markComplete ? 'selesai' : 'draft']);
+
+            $this->rebalance($conversion);
+
+            return $conversion->fresh(['sources.stockBatch', 'results.product', 'results.stockBatch', 'sourceProduct']);
+        });
+    }
+
+    /**
+     * Dipanggil dari SalesOrderService SEBELUM stok dipotong FIFO, setiap kali
+     * sebuah produk dijual. Kalau produk itu kebetulan komponen hasil bongkar
+     * yang masih punya sisa stok, harga jual riil yang baru saja disepakati
+     * dipakai untuk membagi ulang HPP pembongkaran yang bersangkutan.
+     *
+     * Ini inti dari "harga jualnya dihitung di balik layar setelah sales order":
+     * user tidak pernah diminta menebak harga jual saat membongkar.
+     *
+     * Aman dipanggil untuk produk apa pun — kalau bukan komponen bongkar,
+     * fungsinya tidak melakukan apa-apa.
+     */
+    public function syncAfterSale(int $productId, float $sellPrice): void
+    {
+        if ($sellPrice <= 0) {
+            return;
+        }
+
+        $conversionIds = StockConversionResult::where('product_id', $productId)
+            ->pluck('stock_conversion_id')
+            ->unique();
+
+        if ($conversionIds->isEmpty()) {
+            return;
+        }
+
+        StockConversion::whereIn('id', $conversionIds)
+            ->with(['results.stockBatch'])
+            ->get()
+            ->each(function (StockConversion $conversion) use ($productId, $sellPrice) {
+                // Tidak ada gunanya menghitung ulang kalau semua komponennya
+                // sudah habis terjual — tidak ada nilai yang tersisa untuk digeser.
+                $hasRemaining = $conversion->results->contains(
+                    fn($r) => $r->stockBatch && $r->stockBatch->qty_remaining > 0
+                );
+
+                if (! $hasRemaining) {
+                    return;
+                }
+
+                $this->rebalance($conversion, [$productId => $sellPrice]);
+            });
+    }
+
+    /**
+     * Bagi ulang HPP pembongkaran ke komponen yang MASIH PUNYA SISA STOK,
+     * proporsional terhadap harga jual acuan tiap komponen.
+     *
+     * Rumusnya menjaga dua hal sekaligus:
+     * - HPP yang sudah keluar lewat penjualan (hpp_released) tidak diganggu.
+     * - Sisa nilai yang belum tersalur (total_hpp dikurangi yang sudah keluar)
+     *   selalu habis dibagi ke sisa unit, tanpa menciptakan/menghilangkan nilai.
+     *
+     * @param array<int, float> $priceOverrides harga jual yang baru diketahui
+     *                                          (product_id => harga), dipakai
+     *                                          saat dipanggil dari Sales Order.
+     */
+    public function rebalance(StockConversion $conversion, array $priceOverrides = []): void
+    {
+        $conversion->load(['results.stockBatch']);
+
+        if ($conversion->results->isEmpty()) {
+            return;
+        }
+
+        // Nilai yang sudah terlanjur keluar lewat penjualan — tidak boleh diutak-atik.
+        $released = [];
+        $totalReleased = 0.0;
+
+        foreach ($conversion->results as $result) {
+            $released[$result->id] = $result->hpp_released;
+            $totalReleased += $released[$result->id];
+        }
+
+        $pool = round((float) $conversion->total_hpp - $totalReleased, 2);
+
+        $active = $conversion->results
+            ->filter(fn($r) => $r->stockBatch && $r->stockBatch->qty_remaining > 0)
+            ->values();
+
+        if ($active->isEmpty()) {
+            // Semua komponen sudah habis terjual: tidak ada sisa unit untuk
+            // menampung nilai. Sisa (biasanya 0) dicatat sebagai selisih.
+            $conversion->update(['rounding_diff' => $pool]);
+
+            return;
+        }
+
+        $prices = $this->referencePrices($active->pluck('product_id')->all(), $priceOverrides);
+
+        $weights = $active
+            ->map(fn($r) => $r->stockBatch->qty_remaining * ($prices[$r->product_id] ?? 0))
+            ->all();
+
+        $shares = $this->splitPool($pool, $weights);
+
+        $distributed = 0.0;
+
+        foreach ($active as $i => $result) {
+            $qtyRemaining = (int) $result->stockBatch->qty_remaining;
+            $buyPrice = round($shares[$i] / $qtyRemaining, 2);
+
+            // Nilai yang benar-benar tersimpan di stok adalah buy_price * qty,
+            // jadi itu juga yang dicatat supaya laporan bongkar sama persis
+            // dengan nilai persediaan riil.
+            $actual = round($buyPrice * $qtyRemaining, 2);
+            $distributed += $actual;
+
+            $this->stockService->repriceConversionBatch($result->stockBatch, $buyPrice);
+
+            $result->update([
+                'ref_sell_price' => $prices[$result->product_id] ?? null,
+                'buy_price'      => $buyPrice,
+                'hpp_total'      => round($released[$result->id] + $actual, 2),
+            ]);
+        }
+
+        // Sisa pembulatan (paling banter beberapa rupiah) disimpan, bukan disembunyikan.
+        $conversion->update(['rounding_diff' => round($pool - $distributed, 2)]);
     }
 
     /**
      * Batalkan pembongkaran: komponen ditarik kembali dari stok, unit utuh
      * dikembalikan ke batch asalnya. Hanya boleh kalau SEMUA komponen hasil
-     * bongkar masih utuh (belum terjual, belum dibongkar lagi) — kalau sudah
-     * kepakai, nilai HPP-nya sudah terlanjur mengalir ke transaksi lain dan
-     * tidak bisa ditarik balik tanpa merusak laporan.
+     * bongkar masih utuh (belum terjual, belum dibongkar lagi).
      */
     public function delete(StockConversion $conversion): void
     {
@@ -143,14 +384,12 @@ class StockConversionService
                 }
             }
 
-            // Tarik semua batch komponen (aman, sudah dipastikan belum tersentuh)
             foreach ($conversion->results as $result) {
                 if ($result->stockBatch) {
                     $this->stockService->removeConversionBatch($result->stockBatch);
                 }
             }
 
-            // Kembalikan qty unit utuh ke batch asalnya
             foreach ($conversion->sources as $source) {
                 $this->stockService->reverseConversionSource(
                     $source,
@@ -164,64 +403,86 @@ class StockConversionService
     }
 
     /**
-     * Bagi total HPP ke tiap komponen sesuai metode yang dipilih.
-     * Mengembalikan array nominal HPP, indeksnya sejajar dengan $components.
+     * Harga jual acuan per komponen, dengan urutan: harga jual riil terakhir di
+     * Sales Order -> rata-rata komponen lain yang sudah diketahui -> bagi rata.
      *
+     * @param  array<int, int>   $productIds
+     * @param  array<int, float> $overrides harga yang baru saja disepakati di SO
+     *                                      yang sedang diproses (belum tersimpan)
      * @return array<int, float>
      */
-    protected function splitHpp(float $totalHpp, array $components, string $method): array
+    protected function referencePrices(array $productIds, array $overrides = []): array
     {
-        if ($method === 'manual') {
-            $sum = round(array_sum(array_map(fn($c) => (float) $c['hpp_total'], $components)), 2);
+        $productIds = array_values(array_unique($productIds));
 
-            if (abs($sum - round($totalHpp, 2)) > 0.01) {
-                throw new RuntimeException(
-                    'Total HPP komponen (Rp ' . number_format($sum, 0, ',', '.') . ') harus sama persis dengan HPP unit yang dibongkar (Rp ' . number_format($totalHpp, 0, ',', '.') . ').'
-                );
+        $lastPrices = SaleItem::query()
+            ->join('sales_orders', 'sales_orders.id', '=', 'sale_items.sales_order_id')
+            ->whereIn('sale_items.product_id', $productIds)
+            ->orderBy('sales_orders.so_date')
+            ->orderBy('sale_items.id')
+            ->get(['sale_items.product_id', 'sale_items.sell_price'])
+            ->groupBy('product_id')
+            ->map(fn($rows) => (float) $rows->last()->sell_price)
+            ->all();
+
+        $prices = [];
+        foreach ($productIds as $id) {
+            $price = $overrides[$id] ?? ($lastPrices[$id] ?? null);
+
+            if ($price !== null && $price > 0) {
+                $prices[$id] = (float) $price;
             }
-
-            return array_map(fn($c) => round((float) $c['hpp_total'], 2), $components);
         }
 
-        // percent -> bobot = persentase; market -> bobot = estimasi harga jual x qty
-        $weights = array_map(function ($c) use ($method) {
-            return $method === 'percent'
-                ? (float) $c['allocation_percent']
-                : (float) $c['estimated_sell_price'] * (int) $c['qty'];
-        }, $components);
+        // Komponen yang belum pernah terjual: pakai rata-rata yang sudah diketahui
+        // sebagai penahan sementara. Begitu ia terjual pertama kali, angka riilnya
+        // langsung menggantikan ini lewat syncAfterSale().
+        $fallback = count($prices) > 0
+            ? array_sum($prices) / count($prices)
+            : 1.0;
 
+        foreach ($productIds as $id) {
+            $prices[$id] ??= $fallback;
+        }
+
+        return $prices;
+    }
+
+    /**
+     * Bagi $pool mengikuti bobot, dengan baris terakhir menerima SISA supaya
+     * total pembagian tidak pernah meleset dari $pool.
+     *
+     * @param  array<int, float> $weights
+     * @return array<int, float>
+     */
+    protected function splitPool(float $pool, array $weights): array
+    {
         $totalWeight = array_sum($weights);
+        $count = count($weights);
 
+        // Semua bobot 0 (mis. semua harga acuan 0): bagi rata per baris.
         if ($totalWeight <= 0) {
-            throw new RuntimeException(
-                $method === 'percent'
-                    ? 'Total persentase komponen harus lebih dari 0.'
-                    : 'Estimasi harga jual komponen harus diisi (minimal satu komponen bernilai lebih dari 0).'
-            );
+            $weights = array_fill(0, $count, 1);
+            $totalWeight = $count;
         }
 
         $shares = [];
-        $running = 0;
-        $lastIndex = count($components) - 1;
+        $running = 0.0;
 
         foreach ($weights as $i => $weight) {
-            if ($i === $lastIndex) {
-                // Komponen terakhir menerima SISA, bukan hasil hitung ulang —
-                // ini yang menjamin total pembagian tidak pernah meleset dari total HPP.
-                $shares[$i] = round($totalHpp - $running, 2);
+            if ($i === $count - 1) {
+                $shares[$i] = round($pool - $running, 2);
                 break;
             }
 
-            $shares[$i] = round($totalHpp * ($weight / $totalWeight), 2);
+            $shares[$i] = round($pool * ($weight / $totalWeight), 2);
             $running += $shares[$i];
         }
 
         return $shares;
     }
 
-    /**
-     * Validasi yang tidak bisa diwakili aturan FormRequest biasa.
-     */
+    /** Validasi yang tidak bisa diwakili aturan FormRequest biasa. */
     protected function guardComponents(Product $sourceProduct, array $components): void
     {
         if (empty($components)) {

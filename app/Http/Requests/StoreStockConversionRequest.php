@@ -4,6 +4,14 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
+/**
+ * Validasi form "Bongkar Unit".
+ *
+ * Sejak pembagian HPP dibuat otomatis (proporsi harga jual riil dari Sales
+ * Order), form ini tidak lagi menerima allocation_method, allocation_percent,
+ * estimated_sell_price, maupun hpp_total — user cukup menyatakan komponen apa
+ * saja yang keluar dan berapa banyak.
+ */
 class StoreStockConversionRequest extends FormRequest
 {
     public function authorize(): bool
@@ -14,29 +22,19 @@ class StoreStockConversionRequest extends FormRequest
 
     public function rules(): array
     {
-        $method = $this->input('allocation_method');
-
         return [
             'conversion_date'   => ['required', 'date'],
             'source_product_id' => ['required', 'exists:products,id'],
             'source_qty'        => ['required', 'integer', 'min:1'],
-            'allocation_method' => ['required', 'in:percent,market,manual'],
             'note'              => ['nullable', 'string', 'max:1000'],
+
+            // 'draft' = belum semua komponen diketahui, boleh dilanjutkan nanti
+            // lewat "Lanjutkan Bongkar". Default 'selesai'.
+            'status' => ['nullable', 'in:draft,selesai'],
 
             'components'              => ['required', 'array', 'min:1'],
             'components.*.product_id' => ['required', 'exists:products,id'],
             'components.*.qty'        => ['required', 'integer', 'min:1'],
-
-            // Kolom nilai hanya wajib sesuai metode yang dipilih
-            'components.*.allocation_percent' => [
-                $method === 'percent' ? 'required' : 'nullable', 'numeric', 'min:0', 'max:100',
-            ],
-            'components.*.estimated_sell_price' => [
-                $method === 'market' ? 'required' : 'nullable', 'numeric', 'min:0',
-            ],
-            'components.*.hpp_total' => [
-                $method === 'manual' ? 'required' : 'nullable', 'numeric', 'min:0',
-            ],
         ];
     }
 
@@ -55,29 +53,15 @@ class StoreStockConversionRequest extends FormRequest
             if ($ids->contains($this->input('source_product_id'))) {
                 $validator->errors()->add('components', 'Produk hasil bongkar tidak boleh sama dengan produk yang dibongkar.');
             }
-
-            // Metode persentase: total harus 100% (toleransi 0,01 untuk pembulatan input)
-            if ($this->input('allocation_method') === 'percent') {
-                $total = collect($components)->sum(fn($c) => (float) ($c['allocation_percent'] ?? 0));
-
-                if (abs($total - 100) > 0.01) {
-                    $validator->errors()->add(
-                        'components',
-                        'Total persentase semua komponen harus 100% (sekarang ' . rtrim(rtrim(number_format($total, 2, ',', '.'), '0'), ',') . '%).'
-                    );
-                }
-            }
         });
     }
 
     public function messages(): array
     {
         return [
-            'components.required'  => 'Minimal harus ada 1 komponen hasil pembongkaran.',
-            'components.*.qty.min' => 'Qty komponen minimal 1.',
-            'components.*.allocation_percent.required'   => 'Persentase tiap komponen wajib diisi.',
-            'components.*.estimated_sell_price.required' => 'Estimasi harga jual tiap komponen wajib diisi.',
-            'components.*.hpp_total.required'            => 'Nominal HPP tiap komponen wajib diisi.',
+            'components.required'       => 'Minimal harus ada 1 komponen hasil pembongkaran.',
+            'components.*.qty.min'      => 'Qty komponen minimal 1.',
+            'components.*.product_id.required' => 'Masih ada baris komponen yang produknya belum dipilih.',
         ];
     }
 }

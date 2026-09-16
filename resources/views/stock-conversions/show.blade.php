@@ -12,7 +12,14 @@
 
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-                <h2 class="text-2xl font-display font-semibold tracking-tight tnum">{{ $conversion->conversion_number }}</h2>
+                <div class="flex items-center gap-2">
+                    <h2 class="text-2xl font-display font-semibold tracking-tight tnum">{{ $conversion->conversion_number }}</h2>
+                    @if ($conversion->isDraft())
+                        <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">Belum Selesai</span>
+                    @else
+                        <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">Selesai</span>
+                    @endif
+                </div>
                 <p class="text-sm text-ink/50 mt-1">
                     {{ $conversion->conversion_date->format('d M Y') }} &middot;
                     {{ $conversion->source_qty }} {{ $conversion->sourceProduct->unit }} {{ $conversion->sourceProduct->name }}
@@ -21,31 +28,45 @@
             </div>
 
             @if (auth()->user()->isSuperadmin())
-                <button type="button" @click="confirmOpen = true"
-                        class="text-sm font-medium px-4 py-2.5 rounded-xl border border-red-600/20 text-red-700 hover:bg-red-50 transition-colors">
-                    Batalkan Pembongkaran
-                </button>
+                <div class="flex items-center gap-2">
+                    @if ($conversion->isDraft())
+                        <a href="{{ route('stock-conversions.continue', $conversion) }}"
+                           class="text-sm font-semibold px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-ink shadow-glow hover:brightness-105 active:scale-[0.98] transition-all">
+                            Lanjutkan Bongkar
+                        </a>
+                    @endif
+                    <button type="button" @click="confirmOpen = true"
+                            class="text-sm font-medium px-4 py-2.5 rounded-xl border border-red-600/20 text-red-700 hover:bg-red-50 transition-colors">
+                        Batalkan Pembongkaran
+                    </button>
+                </div>
             @endif
         </div>
     </div>
 
+    @if ($conversion->isDraft())
+        <div class="rounded-xl border border-amber-500/25 bg-amber-50/70 px-4 py-3.5 text-sm text-amber-800 mb-6 flex items-start gap-2">
+            <svg viewBox="0 0 24 24" class="h-4 w-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+            <span>
+                Pembongkaran ini ditandai belum lengkap — masih bisa ditambah komponen lewat "Lanjutkan Bongkar".
+                Seluruh HPP unit sudah dibagi ke komponen yang tercatat di bawah, dan akan dibagi ulang otomatis
+                kalau ada komponen baru ditambahkan.
+            </span>
+        </div>
+    @endif
+
     {{-- Ringkasan nilai --}}
-    <div class="grid grid-cols-1 @2xl:grid-cols-3 gap-4 mb-6">
+    <div class="grid grid-cols-1 @2xl:grid-cols-4 gap-4 mb-6">
         <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-5">
             <p class="text-xs font-medium text-ink/45 uppercase tracking-wide">HPP Unit Dibongkar</p>
             <p class="font-display font-semibold text-xl tnum mt-1.5">Rp {{ number_format($conversion->total_hpp, 0, ',', '.') }}</p>
         </div>
-        <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-5">
-            <p class="text-xs font-medium text-ink/45 uppercase tracking-wide">HPP Dibagi ke Komponen</p>
-            <p class="font-display font-semibold text-xl tnum mt-1.5">Rp {{ number_format($conversion->results->sum('hpp_total'), 0, ',', '.') }}</p>
-        </div>
-        <div class="rounded-2xl border border-ink/10 bg-white shadow-card p-5">
-            <p class="text-xs font-medium text-ink/45 uppercase tracking-wide">Metode Pembagian</p>
-            <p class="font-display font-semibold text-xl mt-1.5">{{ $conversion->allocation_method_label }}</p>
-            @if ((float) $conversion->rounding_diff != 0)
-                <p class="text-xs text-ink/40 mt-1 tnum">Selisih pembulatan: Rp {{ number_format($conversion->rounding_diff, 2, ',', '.') }}</p>
-            @endif
-        </div>
+        @php
+            // Yang paling dipedulikan user: kalau unit ini dipecah, total ecerannya
+            // laku berapa? Dipakai harga jual terakhir tiap komponen di Sales Order.
+            $estimatedSalesValue = $conversion->results->sum(fn($r) => (float) $r->ref_sell_price * $r->qty);
+            $estimatedMargin = $estimatedSalesValue - (float) $conversion->total_hpp;
+        @endphp
     </div>
 
     @if ($conversion->note)
@@ -58,7 +79,10 @@
     <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden mb-6">
         <div class="px-6 py-4 border-b border-ink/10">
             <h3 class="font-display font-semibold">Komponen Hasil</h3>
-            <p class="text-xs text-ink/50 mt-0.5">Tiap komponen masuk stok sebagai batch tersendiri dan dijual lewat Sales Order seperti biasa.</p>
+            <p class="text-xs text-ink/50 mt-0.5">
+                Tiap komponen masuk stok sebagai batch tersendiri dan dijual lewat Sales Order seperti biasa.
+                
+            </p>
         </div>
 
         <div class="overflow-x-auto">
@@ -67,8 +91,8 @@
                     <tr class="bg-ink/[0.03] text-left text-ink/50">
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Komponen</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Qty</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">HPP / Unit</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Total HPP</th>
+                        {{-- <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">HPP / Unit</th> --}}
+                        {{-- <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Total HPP</th> --}}
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Sisa di Stok</th>
                     </tr>
                 </thead>
@@ -77,15 +101,13 @@
                         <tr>
                             <td class="px-5 py-3.5">
                                 {{ $result->product->name }}
-                                @if ($conversion->allocation_method === 'percent' && $result->allocation_percent !== null)
-                                    <span class="text-xs text-ink/40 tnum">&middot; {{ rtrim(rtrim(number_format($result->allocation_percent, 2, ',', '.'), '0'), ',') }}%</span>
-                                @elseif ($conversion->allocation_method === 'market' && $result->estimated_sell_price !== null)
-                                    <span class="text-xs text-ink/40 tnum">&middot; est. jual Rp {{ number_format($result->estimated_sell_price, 0, ',', '.') }}</span>
+                                @if ($result->ref_sell_price !== null)
+                                    <span class="text-xs text-ink/40 tnum">&middot; acuan jual Rp {{ number_format($result->ref_sell_price, 0, ',', '.') }}</span>
                                 @endif
                             </td>
                             <td class="px-5 py-3.5 text-right tnum">{{ $result->qty }} {{ $result->product->unit }}</td>
-                            <td class="px-5 py-3.5 text-right tnum">Rp {{ number_format($result->buy_price, 0, ',', '.') }}</td>
-                            <td class="px-5 py-3.5 text-right tnum">Rp {{ number_format($result->hpp_total, 0, ',', '.') }}</td>
+                            {{-- <td class="px-5 py-3.5 text-right tnum">Rp {{ number_format($result->buy_price, 0, ',', '.') }}</td> --}}
+                            {{-- <td class="px-5 py-3.5 text-right tnum">Rp {{ number_format($result->hpp_total, 0, ',', '.') }}</td> --}}
                             <td class="px-5 py-3.5 text-right tnum {{ $result->qty_used > 0 ? 'text-amber-700 font-medium' : 'text-ink/40' }}">
                                 {{ $result->stockBatch?->qty_remaining ?? 0 }} / {{ $result->qty }}
                             </td>
@@ -110,8 +132,8 @@
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Batch</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Asal</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Qty Diambil</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">HPP / Unit</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Subtotal</th>
+                        {{-- <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">HPP / Unit</th> --}}
+                        {{-- <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Subtotal</th> --}}
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-ink/[0.06]">
@@ -120,8 +142,8 @@
                             <td class="px-5 py-3.5 tnum">#{{ $source->stock_batch_id }}</td>
                             <td class="px-5 py-3.5 text-ink/60">{{ $source->stockBatch?->origin_label ?? '-' }}</td>
                             <td class="px-5 py-3.5 text-right tnum">{{ $source->qty_taken }}</td>
-                            <td class="px-5 py-3.5 text-right tnum">Rp {{ number_format($source->buy_price_at_time, 0, ',', '.') }}</td>
-                            <td class="px-5 py-3.5 text-right tnum">Rp {{ number_format($source->hpp_subtotal, 0, ',', '.') }}</td>
+                            {{-- <td class="px-5 py-3.5 text-right tnum">Rp {{ number_format($source->buy_price_at_time, 0, ',', '.') }}</td> --}}
+                            {{-- <td class="px-5 py-3.5 text-right tnum">Rp {{ number_format($source->hpp_subtotal, 0, ',', '.') }}</td> --}}
                         </tr>
                     @endforeach
                 </tbody>

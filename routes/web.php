@@ -73,6 +73,13 @@ Route::middleware('auth')->group(function () {
         ->middleware('role:superadmin')
         ->name('stock-conversions.create');
 
+    // "Lanjutkan Bongkar" — cuma untuk transaksi berstatus draft, lihat
+    // StockConversionService::continueConversion(). Dua segmen di path
+    // (/{id}/continue) jadi tidak ketangkep wildcard resource 'show' di bawah.
+    Route::get('stock-conversions/{stockConversion}/continue', [StockConversionController::class, 'continueForm'])
+        ->middleware('role:superadmin')
+        ->name('stock-conversions.continue');
+
     Route::resource('stock-conversions', StockConversionController::class)
         ->only(['index', 'show']);
 
@@ -160,6 +167,8 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
     // aturan itu ditegakkan di StockConversionService::delete().
     Route::post('stock-conversions', [StockConversionController::class, 'store'])
         ->name('stock-conversions.store');
+    Route::post('stock-conversions/{stockConversion}/continue', [StockConversionController::class, 'continueStore'])
+        ->name('stock-conversions.continue.store');
     Route::delete('stock-conversions/{stockConversion}', [StockConversionController::class, 'destroy'])
         ->name('stock-conversions.destroy');
 

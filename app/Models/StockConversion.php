@@ -7,6 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Header 1 kali pembongkaran unit utuh menjadi komponen.
  * Lihat komentar lengkap konsepnya di migration create_stock_conversions_tables.
+ *
+ * Catatan sejak migration simplify_stock_conversion_allocation:
+ * tidak ada lagi pilihan metode pembagian. HPP unit SELALU dibagi ke komponen
+ * secara proporsional terhadap nilai jualnya (relative sales value), dan harga
+ * jual yang dipakai adalah harga jual RIIL terakhir dari Sales Order — bukan
+ * tebakan yang diketik user saat membongkar.
  */
 class StockConversion extends Model
 {
@@ -16,7 +22,7 @@ class StockConversion extends Model
         'source_product_id',
         'source_qty',
         'total_hpp',
-        'allocation_method',
+        'status',
         'rounding_diff',
         'note',
     ];
@@ -48,6 +54,7 @@ class StockConversion extends Model
     /**
      * Pembongkaran hanya boleh dibatalkan selama SEMUA komponen hasilnya belum
      * tersentuh sama sekali (belum terjual / belum ikut dibongkar lagi).
+     * Berlaku sama untuk transaksi draft maupun yang sudah selesai.
      */
     public function isReversible(): bool
     {
@@ -62,12 +69,20 @@ class StockConversion extends Model
         return true;
     }
 
-    public function getAllocationMethodLabelAttribute(): string
+    /** Belum semua komponen diketahui — masih boleh ditambah lewat "Lanjutkan Bongkar". */
+    public function isDraft(): bool
     {
-        return [
-            'percent' => 'Persentase',
-            'market'  => 'Proporsi Harga Jual',
-            'manual'  => 'Nominal Manual',
-        ][$this->allocation_method] ?? $this->allocation_method;
+        return $this->status === 'draft';
+    }
+
+    /** Semua komponen sudah tercatat. */
+    public function isComplete(): bool
+    {
+        return $this->status === 'selesai';
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return $this->isDraft() ? 'Belum Selesai' : 'Selesai';
     }
 }

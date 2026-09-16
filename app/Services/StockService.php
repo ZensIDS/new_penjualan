@@ -274,6 +274,92 @@ class StockService
     }
 
     /**
+     * Perbarui batch komponen hasil bongkar yang SUDAH ADA, dipakai saat user
+     * menekan "Lanjutkan Bongkar" dan HPP dihitung ulang melibatkan komponen ini.
+     *
+     * Aturan:
+     * - buy_price boleh berubah kapan pun (naik/turun), termasuk saat sebagian
+     *   qty-nya sudah terjual — ini TIDAK mengubah HPP yang sudah tersnapshot di
+     *   SaleItemAllocation.buy_price_at_time milik transaksi lama, cuma mengubah
+     *   nilai buku sisa stok ke depan.
+     * - qty (qty_in) boleh bertambah atau tetap, TAPI TIDAK BOLEH dikurangi
+     *   sampai di bawah qty yang sudah terjual/terpakai (qty_in - qty_remaining).
+     *   Itu sebabnya user hanya bisa "menambah", tidak "mengurangi" komponen
+     *   yang sudah kadung terjual sebagian.
+     *
+     * @throws RuntimeException kalau qty baru lebih kecil dari qty yang sudah terpakai
+     */
+    public function adjustConversionBatch(StockBatch $batch, int $newQty, float $newBuyPrice, string $movementDate): void
+    {
+        $batch = StockBatch::where('id', $batch->id)->lockForUpdate()->first();
+
+        if (! $batch) {
+            throw new RuntimeException('Batch komponen ini tidak ditemukan.');
+        }
+
+        $used = $batch->qty_in - $batch->qty_remaining;
+
+        if ($newQty < $used) {
+            throw new RuntimeException(
+                "Qty komponen \"{$batch->product->name}\" tidak bisa dikurangi sampai di bawah {$used} unit yang sudah terjual/terpakai. Boleh ditambah, tidak boleh dikurangi."
+            );
+        }
+
+        $delta = $newQty - $batch->qty_in;
+
+        if ($delta !== 0) {
+            StockMovement::create([
+                'product_id'     => $batch->product_id,
+                'stock_batch_id' => $batch->id,
+                'type'           => $delta > 0 ? 'in' : 'out',
+                'qty'            => abs($delta),
+                'movement_date'  => $movementDate,
+                'reference_type' => 'stock_conversion',
+                'reference_id'   => $batch->conversionResult?->stock_conversion_id,
+                'note'           => $delta > 0
+                    ? 'Penambahan qty komponen saat melanjutkan pembongkaran'
+                    : 'Penyesuaian qty komponen saat melanjutkan pembongkaran',
+            ]);
+        }
+
+        $batch->qty_in += $delta;
+        $batch->qty_remaining += $delta;
+        $batch->buy_price = $newBuyPrice;
+        $batch->save();
+
+        $this->syncProductQtyOnHand($batch->product_id);
+    }
+
+    /**
+     * Ubah HANYA nilai buku (buy_price) sebuah batch hasil pembongkaran, tanpa
+     * menyentuh qty sama sekali dan tanpa membuat stock_movement (tidak ada
+     * barang yang bergerak — yang berubah cuma penilaiannya).
+     *
+     * Dipakai StockConversionService::rebalance() saat harga jual riil komponen
+     * baru diketahui dari Sales Order, sehingga pembagian HPP unit utuh bisa
+     * dikoreksi mengikuti proporsi harga jual yang sebenarnya.
+     *
+     * AMAN terhadap transaksi lama: HPP penjualan yang sudah terjadi sudah
+     * tersnapshot di SaleItemAllocation.buy_price_at_time, jadi yang berubah
+     * hanyalah nilai sisa stok ke depan.
+     */
+    public function repriceConversionBatch(StockBatch $batch, float $newBuyPrice): void
+    {
+        $batch = StockBatch::where('id', $batch->id)->lockForUpdate()->first();
+
+        if (! $batch) {
+            throw new RuntimeException('Batch komponen ini tidak ditemukan.');
+        }
+
+        if (round((float) $batch->buy_price, 2) === round($newBuyPrice, 2)) {
+            return;
+        }
+
+        $batch->buy_price = $newBuyPrice;
+        $batch->save();
+    }
+
+    /**
      * Hapus 1 batch hasil pembongkaran beserta jejak mutasinya. HANYA boleh
      * dipanggil kalau batch belum tersentuh sama sekali (qty_remaining == qty_in),
      * dicek di StockConversionService.

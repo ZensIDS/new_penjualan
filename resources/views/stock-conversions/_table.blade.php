@@ -13,8 +13,9 @@
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Tanggal</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Unit Dibongkar</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Qty</th>
-                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Nilai HPP</th>
+                        {{-- <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Nilai HPP</th> --}}
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Komponen</th>
+                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Status</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Aksi</th>
                     </tr>
                 </thead>
@@ -27,8 +28,15 @@
                             <td class="px-5 py-3.5 text-right tnum">
                                 {{ $conversion->source_qty }} {{ $conversion->sourceProduct->unit ?? '' }}
                             </td>
-                            <td class="px-5 py-3.5 text-right tnum">Rp {{ number_format($conversion->total_hpp, 0, ',', '.') }}</td>
+                            {{-- <td class="px-5 py-3.5 text-right tnum">Rp {{ number_format($conversion->total_hpp, 0, ',', '.') }}</td> --}}
                             <td class="px-5 py-3.5 text-right tnum text-ink/60">{{ $conversion->results_count }} jenis</td>
+                            <td class="px-5 py-3.5">
+                                @if ($conversion->isDraft())
+                                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">Belum Selesai</span>
+                                @else
+                                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">Selesai</span>
+                                @endif
+                            </td>
                             <td class="px-5 py-3.5 text-right">
                                 <a href="{{ route('stock-conversions.show', $conversion) }}" class="text-ink/60 hover:text-ink font-medium transition-colors">
                                     Lihat &rarr;
@@ -37,7 +45,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-5 py-10 text-center text-ink/40">
+                            <td colspan="8" class="px-5 py-10 text-center text-ink/40">
                                 {{ request('search') ? 'Tidak ada pembongkaran yang cocok dengan pencarian.' : 'Belum ada pembongkaran unit.' }}
                             </td>
                         </tr>
