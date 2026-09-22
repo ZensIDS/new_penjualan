@@ -19,6 +19,7 @@
                     <th class="px-5 py-3 font-medium">Tanggal</th>
                     <th class="px-5 py-3 font-medium">Kategori</th>
                     <th class="px-5 py-3 font-medium">Deskripsi</th>
+                    <th class="px-5 py-3 font-medium">Asal</th>
                     <th class="px-5 py-3 font-medium text-right">Jumlah</th>
                 </tr>
             </thead>
@@ -32,6 +33,16 @@
                             </span>
                         </td>
                         <td class="px-5 py-3 text-ink/70">{{ $e['description'] ?: '—' }}</td>
+                        <td class="px-5 py-3">
+                            @if ($e['po_id'])
+                                <a href="{{ route('purchase-orders.show', $e['po_id']) }}"
+                                   class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors">
+                                    Biaya PO · {{ $e['po_number'] }}
+                                </a>
+                            @else
+                                <span class="text-xs text-ink/35">Manual</span>
+                            @endif
+                        </td>
                         <td class="px-5 py-3 tnum text-right font-medium text-red-700">Rp {{ number_format($e['amount'], 0, ',', '.') }}</td>
                     </tr>
                 @endforeach

@@ -26,6 +26,15 @@ class StorePurchaseOrderRequest extends FormRequest
 
             'initial_payment'          => ['nullable', 'numeric', 'min:0'],
             'payment_method'           => ['nullable', 'in:cash,transfer,other'],
+
+            // Biaya tambahan PO (opsional) — ongkir, bongkar muat, dll, diinput
+            // langsung saat PO dibuat. Tetap tercatat sebagai Expense biasa,
+            // lihat PurchaseOrderService::addExtraCost().
+            'extra_costs'                        => ['nullable', 'array'],
+            'extra_costs.*.expense_category_id'  => ['required', 'exists:expense_categories,id'],
+            'extra_costs.*.expense_date'         => ['required', 'date'],
+            'extra_costs.*.amount'               => ['required', 'numeric', 'min:0.01'],
+            'extra_costs.*.description'          => ['nullable', 'string', 'max:255'],
         ];
     }
 

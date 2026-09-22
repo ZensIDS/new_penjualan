@@ -398,12 +398,22 @@ class ReportService
     {
         $search = trim((string) $search);
 
-        return CashFlow::whereBetween('transaction_date', [$startDate, $endDate])
+        $paginator = CashFlow::whereBetween('transaction_date', [$startDate, $endDate])
             ->when($search !== '', fn($q) => $q->where('description', 'like', "%{$search}%"))
             ->orderByDesc('transaction_date')
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
+
+        // Load 'source' polimorfik + relasi purchaseOrder-nya (kalau sourcenya
+        // Expense/PurchasePayment) sekaligus, supaya badge "Tipe" & link ke PO
+        // di tabel (lihat CashFlow::sourceLabel/relatedPurchaseOrder) tidak N+1.
+        $paginator->getCollection()->loadMorph('source', [
+            Expense::class => ['purchaseOrder'],
+            PurchasePayment::class => ['purchaseOrder'],
+        ]);
+
+        return $paginator;
     }
 
     /**
@@ -746,7 +756,7 @@ class ReportService
 
     private function expenseQuery(string $startDate, string $endDate, ?int $categoryId = null, ?string $search = null)
     {
-        $query = Expense::with('category')->whereBetween('expense_date', [$startDate, $endDate]);
+        $query = Expense::with(['category', 'purchaseOrder:id,po_number'])->whereBetween('expense_date', [$startDate, $endDate]);
 
         if (filled($categoryId)) {
             $query->where('expense_category_id', $categoryId);
@@ -785,10 +795,12 @@ class ReportService
     private function mapExpense(Expense $e): array
     {
         return [
-            'expense_date' => $e->expense_date->format('Y-m-d'),
-            'category'     => $e->category->name ?? '—',
-            'description'  => $e->description,
-            'amount'       => (float) $e->amount,
+            'expense_date'   => $e->expense_date->format('Y-m-d'),
+            'category'       => $e->category->name ?? '—',
+            'description'    => $e->description,
+            'amount'         => (float) $e->amount,
+            'po_id'          => $e->purchaseOrder?->id,
+            'po_number'      => $e->purchaseOrder?->po_number,
         ];
     }
 

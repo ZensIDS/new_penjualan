@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Expense;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,7 @@ class PurchaseOrderService
         protected StockService $stockService,
         protected CashFlowService $cashFlowService,
         protected DocumentNumberService $numberService,
+        protected ExpenseService $expenseService,
     ) {}
 
     /**
@@ -24,9 +26,20 @@ class PurchaseOrderService
      * @param array $items [['product_id', 'qty', 'buy_price'], ...]
      * @param float|null $initialPayment jumlah bayar awal (null = belum bayar sama sekali)
      */
-    public function create(array $data, array $items, ?float $initialPayment = null, string $paymentMethod = 'cash'): PurchaseOrder
+    /**
+     * Buat PO lengkap dengan item-itemnya sekaligus, langsung masukkan
+     * barang ke stok (buat stock_batch per item), catat pembayaran
+     * awal jika ada (cash/partial), dan biaya tambahan jika ada.
+     *
+     * @param array $data ['supplier_id', 'po_date', 'note'] — 'po_number' opsional,
+     *                     kalau tidak diisi akan digenerate otomatis: PO/{Bulan Romawi}/{Tahun}/{Urut}
+     * @param array $items [['product_id', 'qty', 'buy_price'], ...]
+     * @param float|null $initialPayment jumlah bayar awal (null = belum bayar sama sekali)
+     * @param array $extraCosts [['expense_category_id', 'expense_date', 'amount', 'description'], ...] (opsional)
+     */
+    public function create(array $data, array $items, ?float $initialPayment = null, string $paymentMethod = 'cash', array $extraCosts = []): PurchaseOrder
     {
-        return DB::transaction(function () use ($data, $items, $initialPayment, $paymentMethod) {
+        return DB::transaction(function () use ($data, $items, $initialPayment, $paymentMethod, $extraCosts) {
             $totalAmount = 0;
             foreach ($items as $item) {
                 $totalAmount += $item['qty'] * $item['buy_price'];
@@ -57,7 +70,11 @@ class PurchaseOrderService
                 $this->addPayment($po, $po->po_date, $initialPayment, $paymentMethod, 'Pembayaran awal saat PO dibuat');
             }
 
-            return $po->fresh(['items', 'payments']);
+            foreach ($extraCosts as $cost) {
+                $this->addExtraCost($po, $cost);
+            }
+
+            return $po->fresh(['items', 'payments', 'extraCosts']);
         });
     }
 
@@ -141,6 +158,48 @@ class PurchaseOrderService
     }
 
     /**
+     * Tambah biaya tambahan PO (ongkir, bongkar muat, dll). Tercatat sebagai
+     * Expense biasa (purchase_order_id ditautkan ke PO ini) supaya otomatis
+     * ikut ke Laporan Pengeluaran, breakdown kategori, Laba Rugi (operational
+     * expense), dan ledger cash_flows — semua lewat ExpenseService::create()
+     * yang sudah menangani sinkronisasi itu, jadi tidak ada logic duplikat.
+     *
+     * Sengaja TIDAK menambah total_amount/paid_amount PO — biaya ini bukan
+     * bagian dari hutang ke supplier, cuma tercatat & dikelola dari halaman
+     * PO untuk kemudahan & ketertelusuran (bisa lihat semua biaya terkait
+     * satu PO tanpa harus mencarinya di halaman Pengeluaran).
+     *
+     * @param array $data ['expense_category_id', 'expense_date', 'amount', 'description']
+     */
+    public function addExtraCost(PurchaseOrder $po, array $data): Expense
+    {
+        return $this->expenseService->create([
+            ...$data,
+            'purchase_order_id' => $po->id,
+        ]);
+    }
+
+    /**
+     * Edit biaya tambahan PO yang sudah tercatat. Cash_flow terkait ikut
+     * disinkronkan otomatis lewat ExpenseService::update().
+     *
+     * @param array $data ['expense_category_id', 'expense_date', 'amount', 'description']
+     */
+    public function updateExtraCost(Expense $cost, array $data): Expense
+    {
+        return $this->expenseService->update($cost, $data);
+    }
+
+    /**
+     * Hapus biaya tambahan PO + entry cash_flow terkait sekaligus (lewat
+     * ExpenseService::delete()), supaya tidak ada ledger kas yang nyangkut.
+     */
+    public function deleteExtraCost(Expense $cost): void
+    {
+        $this->expenseService->delete($cost);
+    }
+
+    /**
      * Update PO yang sudah ada: ganti data utama + replace semua item lama
      * dengan item baru (batch stok lama dihapus, batch baru dibuat).
      * Tetap boleh dipanggil meskipun PO sudah ada pembayaran (partial/lunas) —
@@ -216,12 +275,17 @@ class PurchaseOrderService
      * Satu-satunya hal yang tetap memblokir hapus adalah kalau ada barang
      * dari PO ini yang sudah terlanjur terjual (batch stok sudah kepakai).
      *
+     * Biaya tambahan PO (extraCosts) ikut dihapus satu per satu lewat
+     * ExpenseService::delete() (bukan dibiarkan cascade di DB) supaya
+     * entry cash_flow milik masing-masing biaya ikut bersih juga — sama
+     * persis pola yang dipakai untuk payments di bawah.
+     *
      * @throws \RuntimeException kalau ada batch yang sudah kepakai
      */
     public function delete(PurchaseOrder $po): void
     {
         DB::transaction(function () use ($po) {
-            $po->loadMissing('items.stockBatch', 'payments');
+            $po->loadMissing('items.stockBatch', 'payments', 'extraCosts');
 
             $this->guardCanModify($po);
 
@@ -231,6 +295,10 @@ class PurchaseOrderService
 
             foreach ($po->payments as $payment) {
                 $this->cashFlowService->deleteForSource($payment);
+            }
+
+            foreach ($po->extraCosts as $cost) {
+                $this->expenseService->delete($cost);
             }
 
             // items & payments ikut terhapus otomatis (cascadeOnDelete di migration)

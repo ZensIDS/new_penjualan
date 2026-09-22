@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StorePurchaseOrderCostRequest;
 use App\Http\Requests\StorePurchaseOrderRequest;
 use App\Http\Requests\StorePurchasePaymentRequest;
+use App\Http\Requests\UpdatePurchaseOrderCostRequest;
 use App\Http\Requests\UpdatePurchaseOrderRequest;
 use App\Http\Requests\UpdatePurchasePaymentRequest;
+use App\Models\Expense;
+use App\Models\ExpenseCategory;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
@@ -78,14 +82,21 @@ class PurchaseOrderController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'unit', 'qty_on_hand']);
 
-        return view('purchase-orders.create', compact('suppliers', 'products'));
+        $expenseCategories = ExpenseCategory::orderBy('name')->get(['id', 'name']);
+
+        return view('purchase-orders.create', compact('suppliers', 'products', 'expenseCategories'));
     }
 
     public function show(PurchaseOrder $purchaseOrder)
     {
-        $purchaseOrder->load(['supplier', 'items.product', 'items.stockBatch', 'items.returnItems', 'payments', 'returns.items.product']);
+        $purchaseOrder->load([
+            'supplier', 'items.product', 'items.stockBatch', 'items.returnItems',
+            'payments', 'returns.items.product', 'extraCosts.category',
+        ]);
 
-        return view('purchase-orders.show', compact('purchaseOrder'));
+        $expenseCategories = ExpenseCategory::orderBy('name')->get(['id', 'name']);
+
+        return view('purchase-orders.show', compact('purchaseOrder', 'expenseCategories'));
     }
 
     public function edit(PurchaseOrder $purchaseOrder)
@@ -159,6 +170,7 @@ class PurchaseOrderController extends Controller
                 items: $validated['items'],
                 initialPayment: $validated['initial_payment'] ?? null,
                 paymentMethod: $validated['payment_method'] ?? 'cash',
+                extraCosts: $validated['extra_costs'] ?? [],
             );
         } catch (\RuntimeException $e) {
             return back()->withErrors(['error' => $e->getMessage()])->withInput();
@@ -206,5 +218,44 @@ class PurchaseOrderController extends Controller
         }
 
         return back()->with('success', 'Pembayaran berhasil diperbarui.');
+    }
+
+    /**
+     * Tambah biaya tambahan PO (ongkir, bongkar muat, dll). Tercatat sebagai
+     * Expense biasa yang ditautkan ke PO ini — otomatis ikut ke Laporan
+     * Pengeluaran, Laba Rugi, dan ledger arus kas (lihat PurchaseOrderService::addExtraCost).
+     */
+    public function storeCost(StorePurchaseOrderCostRequest $request, PurchaseOrder $purchaseOrder)
+    {
+        $this->service->addExtraCost($purchaseOrder, $request->validated());
+
+        return back()->with('success', 'Biaya tambahan PO berhasil dicatat.');
+    }
+
+    /**
+     * Edit biaya tambahan PO yang sudah tercatat (koreksi kategori/nominal/dll).
+     * Entry cash_flow terkait ikut disinkronkan otomatis.
+     */
+    public function updateCost(UpdatePurchaseOrderCostRequest $request, PurchaseOrder $purchaseOrder, Expense $cost)
+    {
+        abort_unless($cost->purchase_order_id === $purchaseOrder->id, 404);
+
+        $this->service->updateExtraCost($cost, $request->validated());
+
+        return back()->with('success', 'Biaya tambahan PO berhasil diperbarui.');
+    }
+
+    /**
+     * Hapus biaya tambahan PO. Entry cash_flow terkait ikut dihapus otomatis
+     * (lihat PurchaseOrderService::deleteExtraCost), supaya ledger arus kas
+     * & Laba Rugi tidak menyisakan biaya "hantu" untuk biaya yang sudah dihapus.
+     */
+    public function destroyCost(PurchaseOrder $purchaseOrder, Expense $cost)
+    {
+        abort_unless($cost->purchase_order_id === $purchaseOrder->id, 404);
+
+        $this->service->deleteExtraCost($cost);
+
+        return back()->with('success', 'Biaya tambahan PO berhasil dihapus.');
     }
 }
