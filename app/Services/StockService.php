@@ -9,6 +9,8 @@ use App\Models\SaleItem;
 use App\Models\SaleItemAllocation;
 use App\Models\SaleReturnItemAllocation;
 use App\Models\StockBatch;
+use App\Models\StockConversion;
+use App\Models\StockConversionSource;
 use App\Models\StockMovement;
 use RuntimeException;
 
@@ -27,6 +29,7 @@ class StockService
         $batch = StockBatch::create([
             'product_id'              => $item->product_id,
             'purchase_order_item_id'  => $item->id,
+            'origin_type'             => 'purchase',
             'batch_date'              => $batchDate,
             'buy_price'                => $item->buy_price,
             'qty_in'                   => $item->qty,
@@ -50,6 +53,46 @@ class StockService
     }
 
     /**
+     * Buat stock_batch baru untuk 1 komponen hasil pembongkaran unit utuh.
+     *
+     * Beda dari receiveFromPurchaseItem(): batch ini TIDAK punya purchase_order_item_id
+     * (tidak ada PO-nya — barangnya sudah dibeli sebelumnya dalam wujud utuh).
+     * buy_price-nya adalah hasil pembagian HPP unit utuh, dihitung oleh
+     * StockConversionService, bukan harga beli dari supplier.
+     */
+    public function receiveFromConversion(
+        StockConversion $conversion,
+        int $productId,
+        int $qty,
+        float $buyPrice
+    ): StockBatch {
+        $batch = StockBatch::create([
+            'product_id'             => $productId,
+            'purchase_order_item_id' => null,
+            'origin_type'            => 'conversion',
+            'batch_date'             => $conversion->conversion_date,
+            'buy_price'              => $buyPrice,
+            'qty_in'                 => $qty,
+            'qty_remaining'          => $qty,
+        ]);
+
+        StockMovement::create([
+            'product_id'     => $productId,
+            'stock_batch_id' => $batch->id,
+            'type'           => 'in',
+            'qty'            => $qty,
+            'movement_date'  => $conversion->conversion_date,
+            'reference_type' => 'stock_conversion',
+            'reference_id'   => $conversion->id,
+            'note'           => "Hasil bongkar {$conversion->conversion_number} dari {$conversion->sourceProduct->name}",
+        ]);
+
+        $this->syncProductQtyOnHand($productId);
+
+        return $batch;
+    }
+
+    /**
      * Potong stok dari batch-batch tertua (FIFO) untuk memenuhi 1 baris SaleItem.
      * Mengembalikan array detail alokasi (untuk dipakai membuat SaleItemAllocation).
      *
@@ -59,12 +102,61 @@ class StockService
      */
     public function allocateFifo(Product $product, int $qtyNeeded, string $movementDate, SaleItem $saleItem): array
     {
+        return $this->allocateFifoRaw(
+            $product,
+            $qtyNeeded,
+            $movementDate,
+            'sale_item',
+            $saleItem->id,
+            fn(StockBatch $batch) => "Penjualan SO #{$saleItem->salesOrder->so_number} (FIFO dari batch #{$batch->id})"
+        );
+    }
+
+    /**
+     * Potong stok FIFO untuk keperluan PEMBONGKARAN unit utuh. Mekanismenya persis
+     * sama dengan penjualan (batch tertua duluan, HPP diambil dari batch asal),
+     * bedanya cuma referensi & catatan mutasinya — barangnya tidak keluar gudang,
+     * tapi berubah wujud jadi komponen (lihat StockConversionService).
+     */
+    public function allocateFifoForConversion(
+        Product $product,
+        int $qtyNeeded,
+        string $movementDate,
+        StockConversion $conversion
+    ): array {
+        return $this->allocateFifoRaw(
+            $product,
+            $qtyNeeded,
+            $movementDate,
+            'stock_conversion',
+            $conversion->id,
+            fn(StockBatch $batch) => "Dibongkar via {$conversion->conversion_number} (FIFO dari batch #{$batch->id})"
+        );
+    }
+
+    /**
+     * Mesin FIFO generik yang dipakai bersama oleh penjualan dan pembongkaran.
+     * Sengaja dipisah supaya aturan FIFO, locking, dan validasi kecukupan stok
+     * cuma ditulis SEKALI — kalau logikanya berubah, semua pemakainya ikut berubah.
+     *
+     * @param callable(StockBatch): string $noteResolver catatan untuk stock_movements
+     *
+     * @throws RuntimeException jika stok tidak mencukupi
+     */
+    public function allocateFifoRaw(
+        Product $product,
+        int $qtyNeeded,
+        string $movementDate,
+        string $referenceType,
+        int $referenceId,
+        callable $noteResolver
+    ): array {
         if ($qtyNeeded <= 0) {
-            throw new RuntimeException('Qty penjualan harus lebih dari 0.');
+            throw new RuntimeException('Qty harus lebih dari 0.');
         }
 
         // Lock baris batch supaya aman dari race condition kalau 2 transaksi
-        // penjualan terjadi bersamaan (wajib dipanggil di dalam DB::transaction()).
+        // terjadi bersamaan (wajib dipanggil di dalam DB::transaction()).
         $batches = $product->availableBatches()->lockForUpdate()->get();
 
         $totalAvailable = $batches->sum('qty_remaining');
@@ -103,9 +195,9 @@ class StockService
                 'type'            => 'out',
                 'qty'             => $qtyFromThisBatch,
                 'movement_date'   => $movementDate,
-                'reference_type'  => 'sale_item',
-                'reference_id'    => $saleItem->id,
-                'note'            => "Penjualan SO #{$saleItem->salesOrder->so_number} (FIFO dari batch #{$batch->id})",
+                'reference_type'  => $referenceType,
+                'reference_id'    => $referenceId,
+                'note'            => $noteResolver($batch),
             ]);
 
             $remainingToTake -= $qtyFromThisBatch;
@@ -148,6 +240,138 @@ class StockService
         foreach (array_keys($affectedProductIds) as $productId) {
             $this->syncProductQtyOnHand($productId);
         }
+    }
+
+    /**
+     * Kembalikan potongan batch sumber saat sebuah PEMBONGKARAN dibatalkan.
+     * Aman dipanggil tanpa validasi batas atas (hanya menambah qty_remaining),
+     * tapi pemanggil (StockConversionService) WAJIB memastikan dulu batch-batch
+     * komponen hasilnya belum kepakai — kalau sudah, bongkarnya tidak boleh dibatalkan.
+     */
+    public function reverseConversionSource(StockConversionSource $source, string $movementDate, string $note): void
+    {
+        $batch = StockBatch::where('id', $source->stock_batch_id)->lockForUpdate()->first();
+
+        if (! $batch) {
+            throw new RuntimeException('Batch stok asal pembongkaran ini tidak ditemukan.');
+        }
+
+        $batch->qty_remaining += $source->qty_taken;
+        $batch->save();
+
+        StockMovement::create([
+            'product_id'     => $batch->product_id,
+            'stock_batch_id' => $batch->id,
+            'type'           => 'in',
+            'qty'            => $source->qty_taken,
+            'movement_date'  => $movementDate,
+            'reference_type' => 'stock_conversion',
+            'reference_id'   => $source->stock_conversion_id,
+            'note'           => $note,
+        ]);
+
+        $this->syncProductQtyOnHand($batch->product_id);
+    }
+
+    /**
+     * Perbarui batch komponen hasil bongkar yang SUDAH ADA, dipakai saat user
+     * menekan "Lanjutkan Bongkar" dan HPP dihitung ulang melibatkan komponen ini.
+     *
+     * Aturan:
+     * - buy_price boleh berubah kapan pun (naik/turun), termasuk saat sebagian
+     *   qty-nya sudah terjual — ini TIDAK mengubah HPP yang sudah tersnapshot di
+     *   SaleItemAllocation.buy_price_at_time milik transaksi lama, cuma mengubah
+     *   nilai buku sisa stok ke depan.
+     * - qty (qty_in) boleh bertambah atau tetap, TAPI TIDAK BOLEH dikurangi
+     *   sampai di bawah qty yang sudah terjual/terpakai (qty_in - qty_remaining).
+     *   Itu sebabnya user hanya bisa "menambah", tidak "mengurangi" komponen
+     *   yang sudah kadung terjual sebagian.
+     *
+     * @throws RuntimeException kalau qty baru lebih kecil dari qty yang sudah terpakai
+     */
+    public function adjustConversionBatch(StockBatch $batch, int $newQty, float $newBuyPrice, string $movementDate): void
+    {
+        $batch = StockBatch::where('id', $batch->id)->lockForUpdate()->first();
+
+        if (! $batch) {
+            throw new RuntimeException('Batch komponen ini tidak ditemukan.');
+        }
+
+        $used = $batch->qty_in - $batch->qty_remaining;
+
+        if ($newQty < $used) {
+            throw new RuntimeException(
+                "Qty komponen \"{$batch->product->name}\" tidak bisa dikurangi sampai di bawah {$used} unit yang sudah terjual/terpakai. Boleh ditambah, tidak boleh dikurangi."
+            );
+        }
+
+        $delta = $newQty - $batch->qty_in;
+
+        if ($delta !== 0) {
+            StockMovement::create([
+                'product_id'     => $batch->product_id,
+                'stock_batch_id' => $batch->id,
+                'type'           => $delta > 0 ? 'in' : 'out',
+                'qty'            => abs($delta),
+                'movement_date'  => $movementDate,
+                'reference_type' => 'stock_conversion',
+                'reference_id'   => $batch->conversionResult?->stock_conversion_id,
+                'note'           => $delta > 0
+                    ? 'Penambahan qty komponen saat melanjutkan pembongkaran'
+                    : 'Penyesuaian qty komponen saat melanjutkan pembongkaran',
+            ]);
+        }
+
+        $batch->qty_in += $delta;
+        $batch->qty_remaining += $delta;
+        $batch->buy_price = $newBuyPrice;
+        $batch->save();
+
+        $this->syncProductQtyOnHand($batch->product_id);
+    }
+
+    /**
+     * Ubah HANYA nilai buku (buy_price) sebuah batch hasil pembongkaran, tanpa
+     * menyentuh qty sama sekali dan tanpa membuat stock_movement (tidak ada
+     * barang yang bergerak — yang berubah cuma penilaiannya).
+     *
+     * Dipakai StockConversionService::rebalance() saat harga jual riil komponen
+     * baru diketahui dari Sales Order, sehingga pembagian HPP unit utuh bisa
+     * dikoreksi mengikuti proporsi harga jual yang sebenarnya.
+     *
+     * AMAN terhadap transaksi lama: HPP penjualan yang sudah terjadi sudah
+     * tersnapshot di SaleItemAllocation.buy_price_at_time, jadi yang berubah
+     * hanyalah nilai sisa stok ke depan.
+     */
+    public function repriceConversionBatch(StockBatch $batch, float $newBuyPrice): void
+    {
+        $batch = StockBatch::where('id', $batch->id)->lockForUpdate()->first();
+
+        if (! $batch) {
+            throw new RuntimeException('Batch komponen ini tidak ditemukan.');
+        }
+
+        if (round((float) $batch->buy_price, 2) === round($newBuyPrice, 2)) {
+            return;
+        }
+
+        $batch->buy_price = $newBuyPrice;
+        $batch->save();
+    }
+
+    /**
+     * Hapus 1 batch hasil pembongkaran beserta jejak mutasinya. HANYA boleh
+     * dipanggil kalau batch belum tersentuh sama sekali (qty_remaining == qty_in),
+     * dicek di StockConversionService.
+     */
+    public function removeConversionBatch(StockBatch $batch): void
+    {
+        $productId = $batch->product_id;
+
+        StockMovement::where('stock_batch_id', $batch->id)->delete();
+        $batch->delete();
+
+        $this->syncProductQtyOnHand($productId);
     }
 
     /**
@@ -230,8 +454,8 @@ class StockService
      * Keluarkan qty dari batch stok hasil 1 baris PO item karena barang
      * dikembalikan (retur) ke supplier. Batch harus milik item yang sama,
      * dan hanya boleh sebesar qty_remaining yang masih ada di batch itu —
-     * kalau barangnya sudah kadung terjual, sisa yang bisa diretur otomatis
-     * lebih kecil (dicek oleh pemanggil / PurchaseReturnService).
+     * kalau barangnya sudah kadung terjual ATAU sudah kadung dibongkar,
+     * sisa yang bisa diretur otomatis lebih kecil.
      *
      * @throws RuntimeException kalau qty retur melebihi sisa batch yang ada
      */
@@ -248,7 +472,7 @@ class StockService
         if (! $batch || $qty > $batch->qty_remaining) {
             $available = $batch->qty_remaining ?? 0;
             throw new RuntimeException(
-                "Qty retur untuk \"{$item->product->name}\" ({$qty}) melebihi sisa stok yang masih ada dari PO ini ({$available}). Barang yang sudah terjual tidak bisa diretur ke supplier."
+                "Qty retur untuk \"{$item->product->name}\" ({$qty}) melebihi sisa stok yang masih ada dari PO ini ({$available}). Barang yang sudah terjual atau sudah dibongkar tidak bisa diretur ke supplier."
             );
         }
 
@@ -306,9 +530,9 @@ class StockService
     }
 
     /**
-     * Cek apakah batch stok hasil 1 baris PO item sudah kepakai (terjual)
-     * sebagian atau seluruhnya. Dipakai buat menolak edit/hapus PO yang
-     * barangnya sudah kadung terjual, walau PO itu sendiri belum dibayar
+     * Cek apakah batch stok hasil 1 baris PO item sudah kepakai (terjual
+     * ATAU dibongkar) sebagian/seluruhnya. Dipakai buat menolak edit/hapus PO
+     * yang barangnya sudah kadung dipakai, walau PO itu sendiri belum dibayar
      * sama sekali (status pembayaran & pergerakan stok itu dua hal terpisah).
      */
     public function isPurchaseItemBatchUsed(PurchaseOrderItem $item): bool
@@ -360,12 +584,14 @@ class StockService
 
     /**
      * Breakdown stok per batch untuk 1 produk (dipakai Laporan Stok).
+     * origin_type ikut dikirim supaya tampilan bisa menandai batch mana yang
+     * lahir dari pembelian dan mana yang lahir dari pembongkaran unit utuh.
      */
     public function batchBreakdown(Product $product)
     {
         return $product->stockBatches()
             ->where('qty_remaining', '>', 0)
             ->orderBy('batch_date')
-            ->get(['id', 'batch_date', 'buy_price', 'qty_in', 'qty_remaining']);
+            ->get(['id', 'batch_date', 'buy_price', 'qty_in', 'qty_remaining', 'origin_type']);
     }
 }

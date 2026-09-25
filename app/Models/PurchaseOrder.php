@@ -40,9 +40,25 @@ class PurchaseOrder extends Model
         return $this->hasMany(PurchaseReturn::class);
     }
 
+    // Biaya tambahan PO (ongkir, bongkar muat, dll) — tercatat sebagai Expense
+    // biasa (ikut Laporan Pengeluaran, breakdown kategori, dan Laba Rugi),
+    // tapi input & pengelolaannya (tambah/edit/hapus) dilakukan dari halaman
+    // detail PO ini. Lihat PurchaseOrderService::addExtraCost() dkk.
+    public function extraCosts()
+    {
+        return $this->hasMany(Expense::class);
+    }
+
     public function getRemainingBalanceAttribute(): float
     {
         return (float) $this->total_amount - (float) $this->paid_amount;
+    }
+
+    public function getExtraCostTotalAttribute(): float
+    {
+        return (float) ($this->relationLoaded('extraCosts')
+            ? $this->extraCosts->sum('amount')
+            : $this->extraCosts()->sum('amount'));
     }
 
     // Kebijakan: edit & hapus PO TETAP diperbolehkan meskipun sudah ada

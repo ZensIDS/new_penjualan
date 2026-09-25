@@ -19,6 +19,7 @@ use App\Http\Controllers\SaleSourceController;
 use App\Http\Controllers\SalesOrderController;
 use App\Http\Controllers\SalesReturnController;
 use App\Http\Controllers\StockController;
+use App\Http\Controllers\StockConversionController;
 use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
 
@@ -63,6 +64,23 @@ Route::middleware('auth')->group(function () {
         ->name('sales-orders.edit');
 
     Route::resource('sales-orders', SalesOrderController::class)
+        ->only(['index', 'show']);
+
+    // Bongkar Unit (stock conversion): pola sama dengan PO/SO — punya halaman
+    // create tersendiri, jadi route 'create' WAJIB didaftarkan sebelum
+    // resource(['index','show']) supaya tidak ketangkep wildcard {stockConversion}.
+    Route::get('stock-conversions/create', [StockConversionController::class, 'create'])
+        ->middleware('role:superadmin')
+        ->name('stock-conversions.create');
+
+    // "Lanjutkan Bongkar" — cuma untuk transaksi berstatus draft, lihat
+    // StockConversionService::continueConversion(). Dua segmen di path
+    // (/{id}/continue) jadi tidak ketangkep wildcard resource 'show' di bawah.
+    Route::get('stock-conversions/{stockConversion}/continue', [StockConversionController::class, 'continueForm'])
+        ->middleware('role:superadmin')
+        ->name('stock-conversions.continue');
+
+    Route::resource('stock-conversions', StockConversionController::class)
         ->only(['index', 'show']);
 
     // Modul di bawah ini pakai pola index + modal (create/edit AJAX),
@@ -123,6 +141,14 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
         ->name('purchase-orders.payments.store');
     Route::put('purchase-orders/{purchaseOrder}/payments/{payment}', [PurchaseOrderController::class, 'updatePayment'])
         ->name('purchase-orders.payments.update');
+    Route::post('purchase-orders/{purchaseOrder}/costs', [PurchaseOrderController::class, 'storeCost'])
+        ->name('purchase-orders.costs.store');
+    Route::put('purchase-orders/{purchaseOrder}/costs/{cost}', [PurchaseOrderController::class, 'updateCost'])
+        ->name('purchase-orders.costs.update');
+    Route::delete('purchase-orders/{purchaseOrder}/costs/{cost}', [PurchaseOrderController::class, 'destroyCost'])
+        ->name('purchase-orders.costs.destroy');
+    Route::post('purchase-orders/{purchaseOrder}/costs/{cost}/pay', [PurchaseOrderController::class, 'payCost'])
+        ->name('purchase-orders.costs.pay');
     Route::post('purchase-orders/{purchaseOrder}/returns', [PurchaseReturnController::class, 'store'])
         ->name('purchase-orders.returns.store');
     Route::delete('purchase-orders/{purchaseOrder}/returns/{return}', [PurchaseReturnController::class, 'destroy'])
@@ -142,6 +168,17 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
         ->name('sales-orders.returns.store');
     Route::delete('sales-orders/{salesOrder}/returns/{return}', [SalesReturnController::class, 'destroy'])
         ->name('sales-orders.returns.destroy');
+
+    // Pembongkaran bersifat immutable (tidak ada 'update'): koreksi dilakukan
+    // dengan membatalkan lalu mencatat ulang, sama seperti pola retur SO/PO.
+    // Pembatalan hanya diizinkan selama komponen hasilnya belum terjual —
+    // aturan itu ditegakkan di StockConversionService::delete().
+    Route::post('stock-conversions', [StockConversionController::class, 'store'])
+        ->name('stock-conversions.store');
+    Route::post('stock-conversions/{stockConversion}/continue', [StockConversionController::class, 'continueStore'])
+        ->name('stock-conversions.continue.store');
+    Route::delete('stock-conversions/{stockConversion}', [StockConversionController::class, 'destroy'])
+        ->name('stock-conversions.destroy');
 
     Route::resource('products', ProductController::class)
         ->only(['store', 'update', 'destroy']);

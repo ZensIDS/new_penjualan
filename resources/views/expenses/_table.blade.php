@@ -19,6 +19,7 @@
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Tanggal</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Kategori</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Keterangan</th>
+                        <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide">Asal</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Jumlah</th>
                         <th class="px-5 py-3.5 font-semibold text-xs uppercase tracking-wide text-right">Aksi</th>
                     </tr>
@@ -33,9 +34,22 @@
                                 </span>
                             </td>
                             <td class="px-5 py-3.5 text-ink/50">{{ $expense->description ?? '—' }}</td>
+                            <td class="px-5 py-3.5">
+                                @if ($expense->purchaseOrder)
+                                    <a href="{{ route('purchase-orders.show', $expense->purchaseOrder) }}"
+                                       class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors">
+                                        Biaya PO · {{ $expense->purchaseOrder->po_number }}
+                                    </a>
+                                @else
+                                    <span class="text-xs text-ink/35">Manual</span>
+                                @endif
+                            </td>
                             <td class="px-5 py-3.5 text-right tnum font-semibold text-red-700/90">Rp{{ number_format($expense->amount, 0, ',', '.') }}</td>
                             <td class="px-5 py-3.5 text-right">
-                                @if (auth()->user()->isSuperadmin())
+                                @if ($expense->purchaseOrder)
+                                    <a href="{{ route('purchase-orders.show', $expense->purchaseOrder) }}"
+                                       class="text-ink/40 hover:text-ink font-medium transition-colors">Kelola di PO</a>
+                                @elseif (auth()->user()->isSuperadmin())
                                     <button
                                         @click="openEdit({{ Illuminate\Support\Js::from($expense) }})"
                                         class="text-ink/60 hover:text-ink font-medium mr-3 transition-colors"
@@ -49,7 +63,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-5 py-10 text-center text-ink/40">
+                            <td colspan="6" class="px-5 py-10 text-center text-ink/40">
                                 {{ request('search') ? 'Tidak ada catatan biaya yang cocok dengan pencarian.' : 'Belum ada catatan biaya.' }}
                             </td>
                         </tr>

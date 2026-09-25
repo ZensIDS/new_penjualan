@@ -165,7 +165,10 @@ class ReportService
         $hpp     = SalesOrder::whereBetween('so_date', [$startDate, $endDate])->sum('total_hpp');
         $grossProfit = $revenue - $hpp;
 
-        $operationalExpense = Expense::whereBetween('expense_date', [$startDate, $endDate])->sum('amount');
+        // Biaya tambahan PO yang belum "Lunas" belum ikut dihitung sebagai
+        // biaya operasional (lihat ExpenseService::createUnpaid/markPaid).
+        $operationalExpense = Expense::where('is_paid', true)
+            ->whereBetween('expense_date', [$startDate, $endDate])->sum('amount');
 
         // Pemasukan Lain (mis. modal, pinjaman, dll) di luar penjualan — HANYA
         // yang kategorinya ditandai affects_profit_loss=true yang ikut menambah
@@ -198,7 +201,8 @@ class ReportService
         $totalProfitSharePercentage = (float) ProfitShare::where('is_active', true)->sum('percentage');
         $totalProfitShareAmount = (float) $profitShares->sum('amount');
 
-        $expenseByCategory = Expense::whereBetween('expense_date', [$startDate, $endDate])
+        $expenseByCategory = Expense::where('is_paid', true)
+            ->whereBetween('expense_date', [$startDate, $endDate])
             ->join('expense_categories', 'expenses.expense_category_id', '=', 'expense_categories.id')
             ->select('expense_categories.name', DB::raw('SUM(expenses.amount) as total'))
             ->groupBy('expense_categories.name')
@@ -398,12 +402,22 @@ class ReportService
     {
         $search = trim((string) $search);
 
-        return CashFlow::whereBetween('transaction_date', [$startDate, $endDate])
+        $paginator = CashFlow::whereBetween('transaction_date', [$startDate, $endDate])
             ->when($search !== '', fn($q) => $q->where('description', 'like', "%{$search}%"))
             ->orderByDesc('transaction_date')
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
+
+        // Load 'source' polimorfik + relasi purchaseOrder-nya (kalau sourcenya
+        // Expense/PurchasePayment) sekaligus, supaya badge "Tipe" & link ke PO
+        // di tabel (lihat CashFlow::sourceLabel/relatedPurchaseOrder) tidak N+1.
+        $paginator->getCollection()->loadMorph('source', [
+            Expense::class => ['purchaseOrder'],
+            PurchasePayment::class => ['purchaseOrder'],
+        ]);
+
+        return $paginator;
     }
 
     /**
@@ -746,7 +760,11 @@ class ReportService
 
     private function expenseQuery(string $startDate, string $endDate, ?int $categoryId = null, ?string $search = null)
     {
-        $query = Expense::with('category')->whereBetween('expense_date', [$startDate, $endDate]);
+        // Biaya tambahan PO yang belum "Lunas" belum tercatat sebagai
+        // pengeluaran (lihat ExpenseService::createUnpaid/markPaid).
+        $query = Expense::with(['category', 'purchaseOrder:id,po_number'])
+            ->where('is_paid', true)
+            ->whereBetween('expense_date', [$startDate, $endDate]);
 
         if (filled($categoryId)) {
             $query->where('expense_category_id', $categoryId);
@@ -766,7 +784,7 @@ class ReportService
      */
     public function expenseReportKpis(string $startDate, string $endDate, ?int $categoryId = null): array
     {
-        $base = Expense::whereBetween('expense_date', [$startDate, $endDate]);
+        $base = Expense::where('is_paid', true)->whereBetween('expense_date', [$startDate, $endDate]);
 
         if (filled($categoryId)) {
             $base->where('expense_category_id', $categoryId);
@@ -785,10 +803,12 @@ class ReportService
     private function mapExpense(Expense $e): array
     {
         return [
-            'expense_date' => $e->expense_date->format('Y-m-d'),
-            'category'     => $e->category->name ?? '—',
-            'description'  => $e->description,
-            'amount'       => (float) $e->amount,
+            'expense_date'   => $e->expense_date->format('Y-m-d'),
+            'category'       => $e->category->name ?? '—',
+            'description'    => $e->description,
+            'amount'         => (float) $e->amount,
+            'po_id'          => $e->purchaseOrder?->id,
+            'po_number'      => $e->purchaseOrder?->po_number,
         ];
     }
 

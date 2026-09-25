@@ -14,15 +14,28 @@
                 <tr class="text-left text-xs text-ink/40 uppercase tracking-wide border-b border-ink/[0.06]">
                     <th class="px-6 py-3 font-medium">Tanggal</th>
                     <th class="px-6 py-3 font-medium">Keterangan</th>
+                    <th class="px-6 py-3 font-medium">Tipe</th>
                     <th class="px-6 py-3 font-medium">Arah</th>
                     <th class="px-6 py-3 font-medium text-right">Jumlah</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-ink/[0.06]">
                 @foreach ($details as $row)
+                    @php $po = $row->related_purchase_order; @endphp
                     <tr>
                         <td class="px-6 py-3 tnum whitespace-nowrap">{{ $row->transaction_date->format('d M Y') }}</td>
                         <td class="px-6 py-3 text-ink/70">{{ $row->description }}</td>
+                        <td class="px-6 py-3">
+                            <span class="inline-flex items-center text-xs font-medium rounded-full px-2.5 py-1 bg-ink/[0.05] text-ink/60">
+                                {{ $row->source_label }}
+                            </span>
+                            @if ($po)
+                                <a href="{{ route('purchase-orders.show', $po) }}"
+                                   class="ml-1.5 text-xs font-semibold text-amber-700 hover:text-amber-800 hover:underline">
+                                    {{ $po->po_number }}
+                                </a>
+                            @endif
+                        </td>
                         <td class="px-6 py-3">
                             <span class="text-xs font-medium rounded-full px-2.5 py-1
                                 {{ $row->direction === 'in' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700' }}">

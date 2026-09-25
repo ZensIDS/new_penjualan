@@ -20,7 +20,10 @@ class ExpenseController extends Controller
         $search    = trim((string) $request->input('search', ''));
 
         $expenses = Expense::query()
-            ->with('category:id,name') // hanya kolom yang dipakai di tabel
+            ->with(['category:id,name', 'purchaseOrder:id,po_number']) // hanya kolom yang dipakai di tabel
+            // Biaya tambahan PO yang belum ditandai "Lunas" belum tercatat
+            // sebagai pengeluaran (lihat ExpenseService::createUnpaid/markPaid).
+            ->where('is_paid', true)
             ->when($startDate, fn($q) => $q->whereDate('expense_date', '>=', $startDate))
             ->when($endDate, fn($q) => $q->whereDate('expense_date', '<=', $endDate))
             ->when($search !== '', function ($q) use ($search) {
@@ -57,6 +60,15 @@ class ExpenseController extends Controller
 
     public function update(UpdateExpenseRequest $request, Expense $expense)
     {
+        // Biaya tambahan PO cuma boleh dikelola dari halaman detail PO
+        // (lihat PurchaseOrderController@updateCost) — bukan dari sini,
+        // supaya konteksnya (PO mana, guard-guard PO) tidak terlewat.
+        if ($expense->purchase_order_id) {
+            return response()->json([
+                'message' => 'Biaya ini berasal dari PO, silakan kelola dari halaman detail PO terkait.',
+            ], 422);
+        }
+
         $this->service->update($expense, $request->validated());
 
         return response()->json([
@@ -67,6 +79,12 @@ class ExpenseController extends Controller
 
     public function destroy(Expense $expense)
     {
+        if ($expense->purchase_order_id) {
+            return response()->json([
+                'message' => 'Biaya ini berasal dari PO, silakan kelola dari halaman detail PO terkait.',
+            ], 422);
+        }
+
         $this->service->delete($expense);
 
         return response()->json([
