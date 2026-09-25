@@ -32,7 +32,8 @@ class StorePurchaseOrderRequest extends FormRequest
             // lihat PurchaseOrderService::addExtraCost().
             'extra_costs'                        => ['nullable', 'array'],
             'extra_costs.*.expense_category_id'  => ['required', 'exists:expense_categories,id'],
-            'extra_costs.*.expense_date'         => ['required', 'date'],
+            // Tidak ada 'extra_costs.*.expense_date' — tanggal biaya tambahan
+            // selalu ikut 'po_date' di atas (lihat PurchaseOrderService::addExtraCost()).
             'extra_costs.*.amount'               => ['required', 'numeric', 'min:0.01'],
             'extra_costs.*.description'          => ['nullable', 'string', 'max:255'],
         ];

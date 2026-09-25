@@ -21,6 +21,9 @@ class ExpenseController extends Controller
 
         $expenses = Expense::query()
             ->with(['category:id,name', 'purchaseOrder:id,po_number']) // hanya kolom yang dipakai di tabel
+            // Biaya tambahan PO yang belum ditandai "Lunas" belum tercatat
+            // sebagai pengeluaran (lihat ExpenseService::createUnpaid/markPaid).
+            ->where('is_paid', true)
             ->when($startDate, fn($q) => $q->whereDate('expense_date', '>=', $startDate))
             ->when($endDate, fn($q) => $q->whereDate('expense_date', '<=', $endDate))
             ->when($search !== '', function ($q) use ($search) {

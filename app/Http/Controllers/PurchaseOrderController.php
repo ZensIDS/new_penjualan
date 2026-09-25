@@ -258,4 +258,19 @@ class PurchaseOrderController extends Controller
 
         return back()->with('success', 'Biaya tambahan PO berhasil dihapus.');
     }
+
+    /**
+     * Tandai biaya tambahan PO sebagai lunas. Baru dari sini biaya tersebut
+     * tercatat ke ledger arus kas dan ikut ke Laporan Pengeluaran & Laba Rugi
+     * (lihat PurchaseOrderService::payExtraCost()).
+     */
+    public function payCost(PurchaseOrder $purchaseOrder, Expense $cost)
+    {
+        abort_unless($cost->purchase_order_id === $purchaseOrder->id, 404);
+        abort_unless(auth()->user()->isSuperadmin(), 403);
+
+        $this->service->payExtraCost($cost);
+
+        return back()->with('success', 'Biaya tambahan PO ditandai lunas & sudah masuk ke Pengeluaran.');
+    }
 }

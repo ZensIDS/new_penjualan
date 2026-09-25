@@ -147,6 +147,8 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
         ->name('purchase-orders.costs.update');
     Route::delete('purchase-orders/{purchaseOrder}/costs/{cost}', [PurchaseOrderController::class, 'destroyCost'])
         ->name('purchase-orders.costs.destroy');
+    Route::post('purchase-orders/{purchaseOrder}/costs/{cost}/pay', [PurchaseOrderController::class, 'payCost'])
+        ->name('purchase-orders.costs.pay');
     Route::post('purchase-orders/{purchaseOrder}/returns', [PurchaseReturnController::class, 'store'])
         ->name('purchase-orders.returns.store');
     Route::delete('purchase-orders/{purchaseOrder}/returns/{return}', [PurchaseReturnController::class, 'destroy'])

@@ -158,36 +158,58 @@ class PurchaseOrderService
     }
 
     /**
-     * Tambah biaya tambahan PO (ongkir, bongkar muat, dll). Tercatat sebagai
-     * Expense biasa (purchase_order_id ditautkan ke PO ini) supaya otomatis
-     * ikut ke Laporan Pengeluaran, breakdown kategori, Laba Rugi (operational
-     * expense), dan ledger cash_flows — semua lewat ExpenseService::create()
-     * yang sudah menangani sinkronisasi itu, jadi tidak ada logic duplikat.
+     * Tambah biaya tambahan PO (ongkir, bongkar muat, dll). Tanggalnya SELALU
+     * disamakan dengan tanggal PO (tidak input tanggal terpisah), dan
+     * dicatat sebagai Expense yang BELUM lunas (is_paid=false) — belum
+     * masuk ke Laporan Pengeluaran, Laba Rugi, maupun ledger cash_flows.
+     * Baru ikut ke sana setelah user menekan tombol "Lunas" di halaman
+     * detail PO (lihat payExtraCost()).
      *
      * Sengaja TIDAK menambah total_amount/paid_amount PO — biaya ini bukan
      * bagian dari hutang ke supplier, cuma tercatat & dikelola dari halaman
      * PO untuk kemudahan & ketertelusuran (bisa lihat semua biaya terkait
      * satu PO tanpa harus mencarinya di halaman Pengeluaran).
      *
-     * @param array $data ['expense_category_id', 'expense_date', 'amount', 'description']
+     * @param array $data ['expense_category_id', 'amount', 'description']
      */
     public function addExtraCost(PurchaseOrder $po, array $data): Expense
     {
-        return $this->expenseService->create([
+        unset($data['expense_date']);
+
+        return $this->expenseService->createUnpaid([
             ...$data,
             'purchase_order_id' => $po->id,
+            'expense_date'      => $po->po_date,
         ]);
     }
 
     /**
-     * Edit biaya tambahan PO yang sudah tercatat. Cash_flow terkait ikut
-     * disinkronkan otomatis lewat ExpenseService::update().
+     * Tandai biaya tambahan PO sebagai lunas. Baru di titik ini biaya
+     * tersebut tercatat ke ledger cash_flows dan otomatis ikut ke Laporan
+     * Pengeluaran & Laba Rugi (lihat ExpenseService::markPaid()).
+     */
+    public function payExtraCost(Expense $cost): Expense
+    {
+        return $this->expenseService->markPaid($cost);
+    }
+
+    /**
+     * Edit biaya tambahan PO yang sudah tercatat. Tanggal SELALU mengikuti
+     * tanggal PO (tidak bisa diubah terpisah). Kalau biaya ini sudah
+     * berstatus lunas, cash_flow terkait ikut disinkronkan otomatis lewat
+     * ExpenseService::update(); kalau belum lunas, memang belum ada
+     * cash_flow yang perlu disinkronkan.
      *
-     * @param array $data ['expense_category_id', 'expense_date', 'amount', 'description']
+     * @param array $data ['expense_category_id', 'amount', 'description']
      */
     public function updateExtraCost(Expense $cost, array $data): Expense
     {
-        return $this->expenseService->update($cost, $data);
+        unset($data['expense_date']);
+
+        return $this->expenseService->update($cost, [
+            ...$data,
+            'expense_date' => $cost->purchaseOrder->po_date,
+        ]);
     }
 
     /**

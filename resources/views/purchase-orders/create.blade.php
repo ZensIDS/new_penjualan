@@ -129,7 +129,7 @@
             <div class="px-6 py-4 border-b border-ink/10 flex items-center justify-between">
                 <div>
                     <h3 class="font-display font-semibold">Biaya Tambahan</h3>
-                    <p class="text-xs text-ink/40 mt-0.5">Opsional — mis. ongkir, bongkar muat. Tercatat sebagai pengeluaran, tidak menambah Total PO di atas.</p>
+                    <p class="text-xs text-ink/40 mt-0.5">Opsional — mis. ongkir, bongkar muat. Tanggal otomatis ikut Tanggal PO, tidak menambah Total PO di atas, dan baru masuk ke Pengeluaran setelah ditandai "Lunas" di halaman detail PO.</p>
                 </div>
                 <button type="button" @click="addExtraCost()"
                         class="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 hover:text-amber-800 shrink-0">
@@ -143,7 +143,7 @@
             <div class="divide-y divide-ink/[0.06]" x-show="extraCosts.length > 0">
                 <template x-for="(cost, index) in extraCosts" :key="cost.key">
                     <div class="p-5 grid grid-cols-1 @4xl:grid-cols-12 gap-3 sm:items-start">
-                        <div class="@4xl:col-span-3">
+                        <div class="@4xl:col-span-4">
                             <label class="block text-xs font-medium text-ink/50 mb-1.5">Kategori</label>
                             <select :name="'extra_costs['+index+'][expense_category_id]'" x-model="cost.expense_category_id"
                                     class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
@@ -154,13 +154,7 @@
                             </select>
                         </div>
 
-                        <div class="@4xl:col-span-2">
-                            <label class="block text-xs font-medium text-ink/50 mb-1.5">Tanggal</label>
-                            <input type="date" :name="'extra_costs['+index+'][expense_date]'" x-model="cost.expense_date"
-                                   class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
-                        </div>
-
-                        <div class="@4xl:col-span-2">
+                        <div class="@4xl:col-span-3">
                             <label class="block text-xs font-medium text-ink/50 mb-1.5">Jumlah</label>
                             <div class="relative">
                                 <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-ink/40">Rp</span>
@@ -260,7 +254,6 @@
             extraCosts: {{ Illuminate\Support\Js::from(old('extra_costs', [])) }}.map(c => ({
                 key: Math.random().toString(36).slice(2),
                 expense_category_id: c.expense_category_id || '',
-                expense_date: c.expense_date || '{{ now()->toDateString() }}',
                 amount: c.amount || '',
                 description: c.description || '',
             })),
@@ -269,7 +262,6 @@
                 this.extraCosts.push({
                     key: Math.random().toString(36).slice(2),
                     expense_category_id: '',
-                    expense_date: '{{ now()->toDateString() }}',
                     amount: '',
                     description: '',
                 });
