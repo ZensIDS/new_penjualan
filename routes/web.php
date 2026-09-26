@@ -166,6 +166,8 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
         ->name('sales-orders.destroy');
     Route::post('sales-orders/{salesOrder}/payments', [SalesOrderController::class, 'storePayment'])
         ->name('sales-orders.payments.store');
+    Route::post('sales-orders/{salesOrder}/unpay', [SalesOrderController::class, 'unmarkPaid'])
+        ->name('sales-orders.unpay');
     Route::put('sales-orders/{salesOrder}/payments/{payment}', [SalesOrderController::class, 'updatePayment'])
         ->name('sales-orders.payments.update');
     Route::post('sales-orders/{salesOrder}/costs', [SalesOrderController::class, 'storeCost'])

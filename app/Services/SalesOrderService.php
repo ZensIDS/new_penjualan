@@ -132,6 +132,35 @@ class SalesOrderService
     }
 
     /**
+     * Kebalikan dari tombol "Tandai Lunas" SO: balikkan status pembayaran
+     * SO ini ke "Belum Bayar" lagi. Karena payment_status dihitung dari
+     * riwayat pembayaran (bukan sekadar flag), membalik status berarti
+     * menghapus SEMUA pembayaran yang sudah tercatat untuk SO ini beserta
+     * entry cash_flow-nya (sama seperti yang dilakukan saat SO dihapus di
+     * delete()), lalu reset paid_amount ke 0.
+     *
+     * Biaya tambahan SO (extraCosts) TIDAK ikut kena efek ini — statusnya
+     * independen dan dibalik terpisah lewat unpayExtraCost().
+     */
+    public function markUnpaid(SalesOrder $so): SalesOrder
+    {
+        return DB::transaction(function () use ($so) {
+            $so->loadMissing('payments');
+
+            foreach ($so->payments as $payment) {
+                $this->cashFlowService->deleteForSource($payment);
+                $payment->delete();
+            }
+
+            $so->paid_amount = 0;
+            $so->payment_status = 'unpaid';
+            $so->save();
+
+            return $so->fresh(['payments']);
+        });
+    }
+
+    /**
      * Edit pembayaran yang sudah tercatat (koreksi salah input nominal/tanggal/dll).
      * paid_amount & payment_status SO dihitung ulang otomatis, dan entry cash_flow
      * terkait ikut disinkronkan — semua dalam satu transaksi supaya konsisten.

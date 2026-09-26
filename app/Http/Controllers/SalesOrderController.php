@@ -185,6 +185,21 @@ class SalesOrderController extends Controller
             ->with('success', "Transaksi {$soNumber} berhasil dihapus, stok terkait sudah dikembalikan.");
     }
 
+    /**
+     * Kebalikan dari "Tandai Lunas": balikkan status pembayaran SO ini ke
+     * "Belum Bayar" lagi. Semua pembayaran yang sudah tercatat untuk SO
+     * ini (beserta ledger arus kasnya) ikut dihapus (lihat
+     * SalesOrderService::markUnpaid()).
+     */
+    public function unmarkPaid(SalesOrder $salesOrder)
+    {
+        abort_unless(auth()->user()->isSuperadmin(), 403);
+
+        $this->service->markUnpaid($salesOrder);
+
+        return back()->with('success', "Transaksi {$salesOrder->so_number} ditandai belum lunas, seluruh pembayaran yang tercatat sudah dihapus.");
+    }
+
     public function store(StoreSalesOrderRequest $request)
     {
         $validated = $request->validated();

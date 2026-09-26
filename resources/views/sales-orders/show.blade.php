@@ -40,6 +40,31 @@
 
         @if ($salesOrder->canBeModified() && auth()->user()->isSuperadmin())
             <div class="flex items-center gap-2">
+                @if ($salesOrder->remaining_balance > 0)
+                    <form method="POST" action="{{ route('sales-orders.payments.store', $salesOrder) }}"
+                          onsubmit="return confirm('Tandai transaksi {{ $salesOrder->so_number }} lunas? Sisa piutang Rp {{ number_format($salesOrder->remaining_balance, 0, ',', '.') }} akan langsung tercatat sebagai pembayaran hari ini.');">
+                        @csrf
+                        <input type="hidden" name="payment_date" value="{{ now()->toDateString() }}">
+                        <input type="hidden" name="amount" value="{{ (float) $salesOrder->remaining_balance }}">
+                        <input type="hidden" name="method" value="cash">
+                        <input type="hidden" name="note" value="Pelunasan langsung">
+                        <button type="submit"
+                                class="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl border border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition-colors">
+                            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                            Tandai Lunas
+                        </button>
+                    </form>
+                @elseif ($salesOrder->payment_status !== 'unpaid')
+                    <form method="POST" action="{{ route('sales-orders.unpay', $salesOrder) }}"
+                          onsubmit="return confirm('Tandai transaksi {{ $salesOrder->so_number }} belum lunas? Seluruh riwayat pembayaran transaksi ini (Rp {{ number_format($salesOrder->paid_amount, 0, ',', '.') }}) akan dihapus dan tidak bisa dikembalikan.');">
+                        @csrf
+                        <button type="submit"
+                                class="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl border border-amber-200 text-amber-700 hover:bg-amber-50 transition-colors">
+                            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
+                            Tandai Belum Lunas
+                        </button>
+                    </form>
+                @endif
                 <a href="{{ route('sales-orders.edit', $salesOrder) }}"
                    class="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl border border-ink/12 hover:bg-ink/[0.03] transition-colors">
                     <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
