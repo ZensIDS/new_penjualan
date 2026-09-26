@@ -51,6 +51,16 @@
                             Tandai Lunas
                         </button>
                     </form>
+                @elseif ($purchaseOrder->payment_status !== 'unpaid')
+                    <form method="POST" action="{{ route('purchase-orders.unpay', $purchaseOrder) }}"
+                          onsubmit="return confirm('Tandai PO {{ $purchaseOrder->po_number }} belum lunas? Seluruh riwayat pembayaran PO ini (Rp {{ number_format($purchaseOrder->paid_amount, 0, ',', '.') }}) akan dihapus dan tidak bisa dikembalikan.');">
+                        @csrf
+                        <button type="submit"
+                                class="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl border border-amber-200 text-amber-700 hover:bg-amber-50 transition-colors">
+                            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
+                            Tandai Belum Lunas
+                        </button>
+                    </form>
                 @endif
                 <a href="{{ route('purchase-orders.edit', $purchaseOrder) }}"
                    class="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl border border-ink/12 hover:bg-ink/[0.03] transition-colors">
@@ -365,6 +375,16 @@
                                                             class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">
                                                         <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
                                                         Tandai Lunas
+                                                    </button>
+                                                </form>
+                                            @else
+                                                <form method="POST" action="{{ route('purchase-orders.costs.unpay', [$purchaseOrder, $cost]) }}"
+                                                      onsubmit="return confirm('Tandai biaya tambahan ini belum lunas? Entri arus kas & Laporan Pengeluaran/Laba Rugi terkait akan dihapus.');">
+                                                    @csrf
+                                                    <button type="submit"
+                                                            class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 transition-colors">
+                                                        <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
+                                                        Tandai Belum Lunas
                                                     </button>
                                                 </form>
                                             @endunless

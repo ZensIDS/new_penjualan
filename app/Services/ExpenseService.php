@@ -64,6 +64,28 @@ class ExpenseService
         });
     }
 
+    /**
+     * Kebalikan dari markPaid(): tandai Expense yang sebelumnya lunas
+     * sebagai belum lunas lagi (is_paid=false), dan hapus entry cash_flow
+     * yang sempat dibuat saat markPaid() — supaya biaya ini balik lagi
+     * tidak ikut ke Laporan Pengeluaran, Laba Rugi, maupun ledger arus kas,
+     * persis seperti kondisi sebelum ditandai lunas.
+     */
+    public function markUnpaid(Expense $expense): Expense
+    {
+        return DB::transaction(function () use ($expense) {
+            if (! $expense->is_paid) {
+                return $expense;
+            }
+
+            $this->findCashFlow($expense)?->delete();
+
+            $expense->update(['is_paid' => false]);
+
+            return $expense->fresh();
+        });
+    }
+
     // Update expense + sinkronkan cash_flow terkait (biar ledger kas tetap konsisten).
     public function update(Expense $expense, array $data): Expense
     {

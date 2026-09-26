@@ -182,6 +182,21 @@ class PurchaseOrderController extends Controller
             ->with('success', "PO {$po->po_number} berhasil dibuat.");
     }
 
+    /**
+     * Kebalikan dari "Tandai Lunas": balikkan status pembayaran PO ini ke
+     * "Belum Bayar" lagi. Semua pembayaran yang sudah tercatat untuk PO
+     * ini (beserta ledger arus kasnya) ikut dihapus (lihat
+     * PurchaseOrderService::markUnpaid()).
+     */
+    public function unmarkPaid(PurchaseOrder $purchaseOrder)
+    {
+        abort_unless(auth()->user()->isSuperadmin(), 403);
+
+        $this->service->markUnpaid($purchaseOrder);
+
+        return back()->with('success', "PO {$purchaseOrder->po_number} ditandai belum lunas, seluruh pembayaran yang tercatat sudah dihapus.");
+    }
+
     public function storePayment(StorePurchasePaymentRequest $request, PurchaseOrder $purchaseOrder)
     {
         $validated = $request->validated();
@@ -272,5 +287,21 @@ class PurchaseOrderController extends Controller
         $this->service->payExtraCost($cost);
 
         return back()->with('success', 'Biaya tambahan PO ditandai lunas & sudah masuk ke Pengeluaran.');
+    }
+
+    /**
+     * Kebalikan dari payCost(): tandai biaya tambahan PO yang sudah lunas
+     * jadi belum lunas lagi. Entry cash_flow terkait ikut dihapus (lihat
+     * PurchaseOrderService::unpayExtraCost()), sehingga biaya ini lepas
+     * lagi dari Laporan Pengeluaran & Laba Rugi.
+     */
+    public function unpayCost(PurchaseOrder $purchaseOrder, Expense $cost)
+    {
+        abort_unless($cost->purchase_order_id === $purchaseOrder->id, 404);
+        abort_unless(auth()->user()->isSuperadmin(), 403);
+
+        $this->service->unpayExtraCost($cost);
+
+        return back()->with('success', 'Biaya tambahan PO ditandai belum lunas & sudah dikeluarkan dari Pengeluaran.');
     }
 }

@@ -158,6 +158,35 @@ class PurchaseOrderService
     }
 
     /**
+     * Kebalikan dari tombol "Tandai Lunas" PO: balikkan status pembayaran
+     * PO ini ke "Belum Bayar" lagi. Karena payment_status dihitung dari
+     * riwayat pembayaran (bukan sekadar flag), membalik status berarti
+     * menghapus SEMUA pembayaran yang sudah tercatat untuk PO ini beserta
+     * entry cash_flow-nya (sama seperti yang dilakukan saat PO dihapus di
+     * delete()), lalu reset paid_amount ke 0.
+     *
+     * Biaya tambahan PO (extraCosts) TIDAK ikut kena efek ini — statusnya
+     * independen dan dibalik terpisah lewat unpayExtraCost().
+     */
+    public function markUnpaid(PurchaseOrder $po): PurchaseOrder
+    {
+        return DB::transaction(function () use ($po) {
+            $po->loadMissing('payments');
+
+            foreach ($po->payments as $payment) {
+                $this->cashFlowService->deleteForSource($payment);
+                $payment->delete();
+            }
+
+            $po->paid_amount = 0;
+            $po->payment_status = 'unpaid';
+            $po->save();
+
+            return $po->fresh(['payments']);
+        });
+    }
+
+    /**
      * Tambah biaya tambahan PO (ongkir, bongkar muat, dll). Tanggalnya SELALU
      * disamakan dengan tanggal PO (tidak input tanggal terpisah), dan
      * dicatat sebagai Expense yang BELUM lunas (is_paid=false) — belum
@@ -191,6 +220,17 @@ class PurchaseOrderService
     public function payExtraCost(Expense $cost): Expense
     {
         return $this->expenseService->markPaid($cost);
+    }
+
+    /**
+     * Kebalikan dari payExtraCost(): tandai biaya tambahan PO yang sudah
+     * lunas menjadi belum lunas lagi. Entry cash_flow yang sempat dibuat
+     * ikut dihapus (lihat ExpenseService::markUnpaid()), jadi biaya ini
+     * otomatis lepas lagi dari Laporan Pengeluaran & Laba Rugi.
+     */
+    public function unpayExtraCost(Expense $cost): Expense
+    {
+        return $this->expenseService->markUnpaid($cost);
     }
 
     /**

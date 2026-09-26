@@ -139,6 +139,8 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
         ->name('purchase-orders.destroy');
     Route::post('purchase-orders/{purchaseOrder}/payments', [PurchaseOrderController::class, 'storePayment'])
         ->name('purchase-orders.payments.store');
+    Route::post('purchase-orders/{purchaseOrder}/unpay', [PurchaseOrderController::class, 'unmarkPaid'])
+        ->name('purchase-orders.unpay');
     Route::put('purchase-orders/{purchaseOrder}/payments/{payment}', [PurchaseOrderController::class, 'updatePayment'])
         ->name('purchase-orders.payments.update');
     Route::post('purchase-orders/{purchaseOrder}/costs', [PurchaseOrderController::class, 'storeCost'])
@@ -149,6 +151,8 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
         ->name('purchase-orders.costs.destroy');
     Route::post('purchase-orders/{purchaseOrder}/costs/{cost}/pay', [PurchaseOrderController::class, 'payCost'])
         ->name('purchase-orders.costs.pay');
+    Route::post('purchase-orders/{purchaseOrder}/costs/{cost}/unpay', [PurchaseOrderController::class, 'unpayCost'])
+        ->name('purchase-orders.costs.unpay');
     Route::post('purchase-orders/{purchaseOrder}/returns', [PurchaseReturnController::class, 'store'])
         ->name('purchase-orders.returns.store');
     Route::delete('purchase-orders/{purchaseOrder}/returns/{return}', [PurchaseReturnController::class, 'destroy'])
