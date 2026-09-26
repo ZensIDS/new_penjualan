@@ -27,6 +27,16 @@ class StoreSalesOrderRequest extends FormRequest
 
             'initial_payment'          => ['nullable', 'numeric', 'min:0'],
             'payment_method'           => ['nullable', 'in:cash,transfer,other'],
+
+            // Biaya tambahan SO (opsional) — ongkir ke customer, biaya packing, dll,
+            // diinput langsung saat SO dibuat. Tetap tercatat sebagai Expense biasa,
+            // lihat SalesOrderService::addExtraCost().
+            'extra_costs'                        => ['nullable', 'array'],
+            'extra_costs.*.expense_category_id'  => ['required', 'exists:expense_categories,id'],
+            // Tidak ada 'extra_costs.*.expense_date' — tanggal biaya tambahan
+            // selalu ikut 'so_date' di atas (lihat SalesOrderService::addExtraCost()).
+            'extra_costs.*.amount'               => ['required', 'numeric', 'min:0.01'],
+            'extra_costs.*.description'          => ['nullable', 'string', 'max:255'],
         ];
     }
 

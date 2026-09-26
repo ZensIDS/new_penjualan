@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Expense;
 use App\Models\Product;
 use App\Models\SalesOrder;
 use App\Models\SalesPayment;
@@ -14,6 +15,7 @@ class SalesOrderService
         protected CashFlowService $cashFlowService,
         protected DocumentNumberService $numberService,
         protected StockConversionService $stockConversionService,
+        protected ExpenseService $expenseService,
     ) {}
 
     /**
@@ -23,10 +25,12 @@ class SalesOrderService
      * @param array $data ['customer_id', 'so_date', 'note'] — 'so_number' opsional,
      *                     kalau tidak diisi akan digenerate otomatis: SO/{Bulan Romawi}/{Tahun}/{Urut}
      * @param array $items [['product_id', 'qty', 'sell_price'], ...]
+     * @param float|null $initialPayment jumlah bayar awal (null = belum bayar sama sekali)
+     * @param array $extraCosts [['expense_category_id', 'amount', 'description'], ...] (opsional)
      */
-    public function create(array $data, array $items, ?float $initialPayment = null, string $paymentMethod = 'cash'): SalesOrder
+    public function create(array $data, array $items, ?float $initialPayment = null, string $paymentMethod = 'cash', array $extraCosts = []): SalesOrder
     {
-        return DB::transaction(function () use ($data, $items, $initialPayment, $paymentMethod) {
+        return DB::transaction(function () use ($data, $items, $initialPayment, $paymentMethod, $extraCosts) {
             $totalAmount = 0;
             foreach ($items as $item) {
                 $totalAmount += $item['qty'] * $item['sell_price'];
@@ -86,7 +90,11 @@ class SalesOrderService
                 $this->addPayment($so, $so->so_date, $initialPayment, $paymentMethod, 'Pembayaran awal saat transaksi');
             }
 
-            return $so->fresh(['items.allocations', 'payments']);
+            foreach ($extraCosts as $cost) {
+                $this->addExtraCost($so, $cost);
+            }
+
+            return $so->fresh(['items.allocations', 'payments', 'extraCosts']);
         });
     }
 
@@ -275,7 +283,7 @@ class SalesOrderService
     public function delete(SalesOrder $so): void
     {
         DB::transaction(function () use ($so) {
-            $so->loadMissing('items.allocations', 'payments');
+            $so->loadMissing('items.allocations', 'payments', 'extraCosts');
 
             $this->guardCanModify($so);
 
@@ -291,9 +299,87 @@ class SalesOrderService
                 $this->cashFlowService->deleteForSource($payment);
             }
 
+            foreach ($so->extraCosts as $cost) {
+                $this->expenseService->delete($cost);
+            }
+
             // items & payments ikut terhapus otomatis (cascadeOnDelete di migration)
             $so->delete();
         });
+    }
+
+    /**
+     * Tambah biaya tambahan SO (ongkir ke customer, biaya packing, dll).
+     * Tanggalnya SELALU disamakan dengan tanggal SO (tidak input tanggal
+     * terpisah), dan dicatat sebagai Expense yang BELUM lunas (is_paid=false)
+     * — belum masuk ke Laporan Pengeluaran, Laba Rugi, maupun ledger
+     * cash_flows. Baru ikut ke sana setelah user menekan tombol "Lunas" di
+     * halaman detail SO (lihat payExtraCost()).
+     *
+     * Sengaja TIDAK menambah total_amount/paid_amount SO — biaya ini bukan
+     * bagian dari piutang ke customer, cuma tercatat & dikelola dari
+     * halaman SO untuk kemudahan & ketertelusuran.
+     *
+     * @param array $data ['expense_category_id', 'amount', 'description']
+     */
+    public function addExtraCost(SalesOrder $so, array $data): Expense
+    {
+        unset($data['expense_date']);
+
+        return $this->expenseService->createUnpaid([
+            ...$data,
+            'sales_order_id' => $so->id,
+            'expense_date'   => $so->so_date,
+        ]);
+    }
+
+    /**
+     * Tandai biaya tambahan SO sebagai lunas. Baru di titik ini biaya
+     * tersebut tercatat ke ledger cash_flows dan otomatis ikut ke Laporan
+     * Pengeluaran & Laba Rugi (lihat ExpenseService::markPaid()).
+     */
+    public function payExtraCost(Expense $cost): Expense
+    {
+        return $this->expenseService->markPaid($cost);
+    }
+
+    /**
+     * Kebalikan dari payExtraCost(): tandai biaya tambahan SO yang sudah
+     * lunas menjadi belum lunas lagi. Entry cash_flow terkait ikut dihapus
+     * (lihat ExpenseService::markUnpaid()), sehingga biaya ini lepas lagi
+     * dari Laporan Pengeluaran & Laba Rugi.
+     */
+    public function unpayExtraCost(Expense $cost): Expense
+    {
+        return $this->expenseService->markUnpaid($cost);
+    }
+
+    /**
+     * Edit biaya tambahan SO yang sudah tercatat. Tanggal SELALU mengikuti
+     * tanggal SO (tidak bisa diubah terpisah). Kalau biaya ini sudah
+     * berstatus lunas, cash_flow terkait ikut disinkronkan otomatis lewat
+     * ExpenseService::update(); kalau belum lunas, memang belum ada
+     * cash_flow yang perlu disinkronkan.
+     *
+     * @param array $data ['expense_category_id', 'amount', 'description']
+     */
+    public function updateExtraCost(Expense $cost, array $data): Expense
+    {
+        unset($data['expense_date']);
+
+        return $this->expenseService->update($cost, [
+            ...$data,
+            'expense_date' => $cost->salesOrder->so_date,
+        ]);
+    }
+
+    /**
+     * Hapus biaya tambahan SO + entry cash_flow terkait sekaligus (lewat
+     * ExpenseService::delete()), supaya tidak ada ledger kas yang nyangkut.
+     */
+    public function deleteExtraCost(Expense $cost): void
+    {
+        $this->expenseService->delete($cost);
     }
 
     /**

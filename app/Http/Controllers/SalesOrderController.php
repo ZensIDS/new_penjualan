@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreSalesOrderCostRequest;
 use App\Http\Requests\StoreSalesOrderRequest;
 use App\Http\Requests\StoreSalesPaymentRequest;
+use App\Http\Requests\UpdateSalesOrderCostRequest;
 use App\Http\Requests\UpdateSalesOrderRequest;
 use App\Http\Requests\UpdateSalesPaymentRequest;
 use App\Models\Customer;
+use App\Models\Expense;
+use App\Models\ExpenseCategory;
 use App\Models\Product;
 use App\Models\SaleSource;
 use App\Models\SalesOrder;
@@ -104,15 +108,18 @@ class SalesOrderController extends Controller
         $customers = Customer::orderBy('name')->get(['id', 'name']);
         $products = $this->productsForForm();
         $sources = SaleSource::orderBy('name')->get(['id', 'name']);
+        $expenseCategories = ExpenseCategory::orderBy('name')->get(['id', 'name']);
 
-        return view('sales-orders.create', compact('customers', 'products', 'sources'));
+        return view('sales-orders.create', compact('customers', 'products', 'sources', 'expenseCategories'));
     }
 
     public function show(SalesOrder $salesOrder)
     {
-        $salesOrder->load(['customer', 'source', 'items.product', 'items.allocations.stockBatch', 'items.returnItems', 'payments', 'returns.items.product']);
+        $salesOrder->load(['customer', 'source', 'items.product', 'items.allocations.stockBatch', 'items.returnItems', 'payments', 'returns.items.product', 'extraCosts.category']);
 
-        return view('sales-orders.show', compact('salesOrder'));
+        $expenseCategories = ExpenseCategory::orderBy('name')->get(['id', 'name']);
+
+        return view('sales-orders.show', compact('salesOrder', 'expenseCategories'));
     }
 
     public function edit(SalesOrder $salesOrder)
@@ -193,6 +200,7 @@ class SalesOrderController extends Controller
                 items: $validated['items'],
                 initialPayment: $validated['initial_payment'] ?? null,
                 paymentMethod: $validated['payment_method'] ?? 'cash',
+                extraCosts: $validated['extra_costs'] ?? [],
             );
         } catch (\RuntimeException $e) {
             // Termasuk error "stok tidak mencukupi" dari StockService::allocateFifo()
@@ -240,5 +248,76 @@ class SalesOrderController extends Controller
         }
 
         return back()->with('success', 'Pembayaran berhasil diperbarui.');
+    }
+
+    /**
+     * Tambah biaya tambahan SO (ongkir ke customer, biaya packing, dll).
+     * Tercatat sebagai Expense biasa yang ditautkan ke SO ini — otomatis
+     * ikut ke Laporan Pengeluaran, Laba Rugi, dan ledger arus kas setelah
+     * ditandai "Lunas" (lihat SalesOrderService::addExtraCost).
+     */
+    public function storeCost(StoreSalesOrderCostRequest $request, SalesOrder $salesOrder)
+    {
+        $this->service->addExtraCost($salesOrder, $request->validated());
+
+        return back()->with('success', 'Biaya tambahan SO berhasil dicatat.');
+    }
+
+    /**
+     * Edit biaya tambahan SO yang sudah tercatat (koreksi kategori/nominal/dll).
+     * Entry cash_flow terkait ikut disinkronkan otomatis.
+     */
+    public function updateCost(UpdateSalesOrderCostRequest $request, SalesOrder $salesOrder, Expense $cost)
+    {
+        abort_unless($cost->sales_order_id === $salesOrder->id, 404);
+
+        $this->service->updateExtraCost($cost, $request->validated());
+
+        return back()->with('success', 'Biaya tambahan SO berhasil diperbarui.');
+    }
+
+    /**
+     * Hapus biaya tambahan SO. Entry cash_flow terkait ikut dihapus otomatis
+     * (lihat SalesOrderService::deleteExtraCost), supaya ledger arus kas &
+     * Laba Rugi tidak menyisakan biaya "hantu" untuk biaya yang sudah dihapus.
+     */
+    public function destroyCost(SalesOrder $salesOrder, Expense $cost)
+    {
+        abort_unless($cost->sales_order_id === $salesOrder->id, 404);
+
+        $this->service->deleteExtraCost($cost);
+
+        return back()->with('success', 'Biaya tambahan SO berhasil dihapus.');
+    }
+
+    /**
+     * Tandai biaya tambahan SO sebagai lunas. Baru dari sini biaya tersebut
+     * tercatat ke ledger arus kas dan ikut ke Laporan Pengeluaran & Laba
+     * Rugi (lihat SalesOrderService::payExtraCost()).
+     */
+    public function payCost(SalesOrder $salesOrder, Expense $cost)
+    {
+        abort_unless($cost->sales_order_id === $salesOrder->id, 404);
+        abort_unless(auth()->user()->isSuperadmin(), 403);
+
+        $this->service->payExtraCost($cost);
+
+        return back()->with('success', 'Biaya tambahan SO ditandai lunas & sudah masuk ke Pengeluaran.');
+    }
+
+    /**
+     * Kebalikan dari payCost(): tandai biaya tambahan SO yang sudah lunas
+     * jadi belum lunas lagi. Entry cash_flow terkait ikut dihapus (lihat
+     * SalesOrderService::unpayExtraCost()), sehingga biaya ini lepas lagi
+     * dari Laporan Pengeluaran & Laba Rugi.
+     */
+    public function unpayCost(SalesOrder $salesOrder, Expense $cost)
+    {
+        abort_unless($cost->sales_order_id === $salesOrder->id, 404);
+        abort_unless(auth()->user()->isSuperadmin(), 403);
+
+        $this->service->unpayExtraCost($cost);
+
+        return back()->with('success', 'Biaya tambahan SO ditandai belum lunas & sudah dikeluarkan dari Pengeluaran.');
     }
 }

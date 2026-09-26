@@ -332,6 +332,185 @@
                     </div>
                 @endif
             </div>
+
+            {{-- Biaya Tambahan SO --}}
+            <div class="rounded-2xl border border-ink/10 bg-white shadow-card overflow-hidden">
+                <div class="px-6 py-4 border-b border-ink/10 flex items-center justify-between gap-3">
+                    <div>
+                        <h3 class="font-display font-semibold">Biaya Tambahan SO</h3>
+                        <p class="text-xs text-ink/40 mt-0.5">Mis. ongkir ke customer, biaya packing &mdash; tanggal otomatis {{ $salesOrder->so_date->format('d M Y') }} (ikut Tanggal SO), tidak menambah total piutang SO, dan baru masuk Pengeluaran setelah ditandai "Lunas".</p>
+                    </div>
+                    @if ($salesOrder->extraCosts->isNotEmpty())
+                        <div class="text-right shrink-0">
+                            <p class="text-sm font-semibold tnum">Rp {{ number_format($salesOrder->extra_cost_total, 0, ',', '.') }}</p>
+                            @php $unpaidExtraCostTotal = $salesOrder->extraCosts->where('is_paid', false)->sum('amount'); @endphp
+                            @if ($unpaidExtraCostTotal > 0)
+                                <p class="text-xs text-amber-700 font-medium">Rp {{ number_format($unpaidExtraCostTotal, 0, ',', '.') }} belum lunas</p>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+
+                @if ($salesOrder->extraCosts->isEmpty())
+                    <p class="px-6 py-8 text-sm text-ink/40 text-center">Belum ada biaya tambahan tercatat.</p>
+                @else
+                    <div class="divide-y divide-ink/[0.06] text-sm">
+                        @foreach ($salesOrder->extraCosts->sortByDesc('expense_date') as $cost)
+                            <div x-data="costEditRow({{ (int) round($cost->amount) }})" x-cloak>
+                                <div class="flex items-center justify-between px-6 py-3.5" x-show="!editing">
+                                    <div>
+                                        <p class="font-medium">Rp {{ number_format($cost->amount, 0, ',', '.') }}
+                                            <span class="font-normal text-ink/40">&middot; {{ $cost->category->name ?? '—' }}</span>
+                                            @if ($cost->is_paid)
+                                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold bg-emerald-100 text-emerald-700 align-middle">Lunas</span>
+                                            @else
+                                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-800 align-middle">Belum Lunas</span>
+                                            @endif
+                                        </p>
+                                        <p class="text-xs text-ink/40">
+                                            {{ $cost->expense_date->format('d M Y') }}
+                                            @if ($cost->description) &middot; {{ $cost->description }} @endif
+                                        </p>
+                                    </div>
+                                    @if (auth()->user()->isSuperadmin())
+                                        <div class="flex items-center gap-1 shrink-0">
+                                            @unless ($cost->is_paid)
+                                                <form method="POST" action="{{ route('sales-orders.costs.pay', [$salesOrder, $cost]) }}"
+                                                      onsubmit="return confirm('Tandai biaya tambahan ini lunas? Biaya akan langsung tercatat ke arus kas & Laporan Pengeluaran/Laba Rugi.');">
+                                                    @csrf
+                                                    <button type="submit"
+                                                            class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">
+                                                        <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                                                        Tandai Lunas
+                                                    </button>
+                                                </form>
+                                            @else
+                                                <form method="POST" action="{{ route('sales-orders.costs.unpay', [$salesOrder, $cost]) }}"
+                                                      onsubmit="return confirm('Tandai biaya tambahan ini belum lunas? Entri arus kas & Laporan Pengeluaran/Laba Rugi terkait akan dihapus.');">
+                                                    @csrf
+                                                    <button type="submit"
+                                                            class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 transition-colors">
+                                                        <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
+                                                        Tandai Belum Lunas
+                                                    </button>
+                                                </form>
+                                            @endunless
+                                            <button type="button" @click="editing = true"
+                                                    class="text-ink/40 hover:text-amber-700 p-1.5" title="Edit biaya tambahan">
+                                                <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                                            </button>
+                                            <form method="POST" action="{{ route('sales-orders.costs.destroy', [$salesOrder, $cost]) }}"
+                                                  onsubmit="return confirm('Hapus biaya tambahan ini? {{ $cost->is_paid ? 'Entri arus kas & Laba Rugi terkait akan ikut dihapus. ' : '' }}Aksi ini tidak bisa dibatalkan.');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="text-ink/40 hover:text-red-600 p-1.5" title="Hapus biaya tambahan">
+                                                    <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    @endif
+                                </div>
+
+                                @if (auth()->user()->isSuperadmin())
+                                    <form x-show="editing" x-transition method="POST"
+                                          action="{{ route('sales-orders.costs.update', [$salesOrder, $cost]) }}"
+                                          class="px-6 py-4 bg-amber-50/40 space-y-3">
+                                        @csrf
+                                        @method('PUT')
+                                        <div class="grid grid-cols-1 @4xl:grid-cols-2 gap-3">
+                                            <div>
+                                                <label class="block text-xs font-medium text-ink/50 mb-1">Kategori</label>
+                                                <select name="expense_category_id" class="w-full rounded-lg border border-ink/12 px-3 py-2 text-sm bg-white focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                                                    @foreach ($expenseCategories as $category)
+                                                        <option value="{{ $category->id }}" @selected($cost->expense_category_id === $category->id)>{{ $category->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-ink/50 mb-1">Jumlah</label>
+                                                <div class="relative">
+                                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink/40">Rp</span>
+                                                    <input type="text" inputmode="numeric"
+                                                           :value="formatRupiah(amount)"
+                                                           @input="amount = parseRupiah($event.target.value); $event.target.value = formatRupiah(amount)"
+                                                           class="w-full rounded-lg border border-ink/12 pl-8 pr-3 py-2 text-sm tnum focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                                                    <input type="hidden" name="amount" :value="amount">
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-ink/50 mb-1">Keterangan</label>
+                                                <input type="text" name="description" value="{{ $cost->description }}" placeholder="Opsional"
+                                                       class="w-full rounded-lg border border-ink/12 px-3 py-2 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                                            </div>
+                                        </div>
+                                        <p class="text-xs text-ink/40">
+                                            @if ($cost->is_paid)
+                                                Mengubah nominal ini akan otomatis menyesuaikan catatan arus kas & Laba Rugi terkait.
+                                            @else
+                                                Biaya ini belum lunas, jadi belum tercatat ke arus kas/Laporan Pengeluaran — tekan "Lunas" untuk mencatatkannya.
+                                            @endif
+                                        </p>
+                                        <div class="flex items-center gap-2">
+                                            <button type="submit"
+                                                    class="text-xs font-semibold px-4 py-2 rounded-lg bg-ink text-white hover:bg-ink/90 transition-colors">
+                                                Simpan
+                                            </button>
+                                            <button type="button" @click="editing = false"
+                                                    class="text-xs font-medium px-4 py-2 rounded-lg border border-ink/12 hover:bg-ink/[0.03] transition-colors">
+                                                Batal
+                                            </button>
+                                        </div>
+                                    </form>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
+                @if (auth()->user()->isSuperadmin())
+                    <div x-data="soCostForm()" x-cloak class="px-6 py-4 border-t border-ink/10">
+                        <button type="button" @click="open = !open"
+                                class="text-sm font-semibold text-amber-700 hover:text-amber-800 inline-flex items-center gap-1.5">
+                            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                            Tambah Biaya Tambahan
+                        </button>
+
+                        <form x-show="open" x-cloak method="POST" action="{{ route('sales-orders.costs.store', $salesOrder) }}" class="mt-4 space-y-4">
+                            @csrf
+                            <div>
+                                <label class="block text-sm font-medium mb-1.5">Kategori</label>
+                                <select name="expense_category_id" required
+                                        class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                                    <option value="" disabled selected>Pilih kategori&hellip;</option>
+                                    @foreach ($expenseCategories as $category)
+                                        <option value="{{ $category->id }}">{{ $category->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1.5">Jumlah</label>
+                                <div class="relative">
+                                    <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-ink/40">Rp</span>
+                                    <input type="text" inputmode="numeric"
+                                           :value="formatRupiah(amount)"
+                                           @input="amount = parseRupiah($event.target.value); $event.target.value = formatRupiah(amount)"
+                                           class="w-full rounded-xl border border-ink/12 pl-9 pr-3.5 py-2.5 text-sm tnum focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                                    <input type="hidden" name="amount" :value="amount">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1.5">Keterangan</label>
+                                <input type="text" name="description" placeholder="Opsional, mis. ongkos kirim ke customer"
+                                       class="w-full rounded-xl border border-ink/12 px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 transition-shadow">
+                            </div>
+                            <button type="submit"
+                                    class="w-full text-sm font-semibold px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-ink shadow-glow hover:brightness-105 active:scale-[0.98] transition-all">
+                                Simpan Biaya Tambahan
+                            </button>
+                        </form>
+                    </div>
+                @endif
+            </div>
         </div>
 
         <div class="space-y-6">
@@ -356,6 +535,12 @@
                             Rp {{ number_format($salesOrder->remaining_balance, 0, ',', '.') }}
                         </span>
                     </div>
+                    @if ($salesOrder->extraCosts->isNotEmpty())
+                        <div class="flex items-center justify-between px-6 py-3.5">
+                            <span class="text-ink/60">Biaya Tambahan</span>
+                            <span class="tnum font-medium">Rp {{ number_format($salesOrder->extra_cost_total, 0, ',', '.') }}</span>
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -466,6 +651,20 @@
             setAmount(value) {
                 this.amount = value === '' ? '' : Math.min(value, this.max);
             },
+        };
+    }
+
+    function soCostForm() {
+        return {
+            open: false,
+            amount: '',
+        };
+    }
+
+    function costEditRow(initialAmount) {
+        return {
+            editing: false,
+            amount: initialAmount,
         };
     }
 </script>

@@ -50,9 +50,25 @@ class SalesOrder extends Model
         return $this->hasMany(SalesReturn::class);
     }
 
+    // Biaya tambahan SO (ongkir ke customer, biaya packing, dll) — tercatat
+    // sebagai Expense biasa (ikut Laporan Pengeluaran, breakdown kategori,
+    // dan Laba Rugi), tapi input & pengelolaannya (tambah/edit/hapus/lunas)
+    // dilakukan dari halaman detail SO ini. Lihat SalesOrderService::addExtraCost() dkk.
+    public function extraCosts()
+    {
+        return $this->hasMany(Expense::class);
+    }
+
     public function getRemainingBalanceAttribute(): float
     {
         return (float) $this->total_amount - (float) $this->paid_amount;
+    }
+
+    public function getExtraCostTotalAttribute(): float
+    {
+        return (float) ($this->relationLoaded('extraCosts')
+            ? $this->extraCosts->sum('amount')
+            : $this->extraCosts()->sum('amount'));
     }
 
     public function getGrossProfitAttribute(): float

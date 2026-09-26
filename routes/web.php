@@ -168,6 +168,16 @@ Route::middleware(['auth', 'role:superadmin'])->group(function () {
         ->name('sales-orders.payments.store');
     Route::put('sales-orders/{salesOrder}/payments/{payment}', [SalesOrderController::class, 'updatePayment'])
         ->name('sales-orders.payments.update');
+    Route::post('sales-orders/{salesOrder}/costs', [SalesOrderController::class, 'storeCost'])
+        ->name('sales-orders.costs.store');
+    Route::put('sales-orders/{salesOrder}/costs/{cost}', [SalesOrderController::class, 'updateCost'])
+        ->name('sales-orders.costs.update');
+    Route::delete('sales-orders/{salesOrder}/costs/{cost}', [SalesOrderController::class, 'destroyCost'])
+        ->name('sales-orders.costs.destroy');
+    Route::post('sales-orders/{salesOrder}/costs/{cost}/pay', [SalesOrderController::class, 'payCost'])
+        ->name('sales-orders.costs.pay');
+    Route::post('sales-orders/{salesOrder}/costs/{cost}/unpay', [SalesOrderController::class, 'unpayCost'])
+        ->name('sales-orders.costs.unpay');
     Route::post('sales-orders/{salesOrder}/returns', [SalesReturnController::class, 'store'])
         ->name('sales-orders.returns.store');
     Route::delete('sales-orders/{salesOrder}/returns/{return}', [SalesReturnController::class, 'destroy'])
